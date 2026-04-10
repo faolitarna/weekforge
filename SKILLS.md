@@ -1,0 +1,28 @@
+# 🧠 Project Skills
+
+Skills are reusable procedural knowledge that any AI agent can load on-demand when working on specific tasks. Unlike agents (which define *who* the AI is), skills define *how* to do something correctly.
+
+## Available Skills
+
+Project-level skills live in `.agents/skills/`. Global skills live in `~/.agents/skills/`.
+
+### Project Skills
+
+#### Specs Management
+- **Path**: `.agents/skills/specs-management/SKILL.md`
+- **When loaded**: When creating, editing, reviewing, or tracking spec files in `specs/`.
+- **What it provides**: Frontmatter schema, status lifecycle, version bumping rules, change process, decision log protocol, and traceability matrix conventions.
+
+## Agents vs Skills
+
+| Concept | What it defines | When loaded | Example |
+|---------|----------------|-------------|---------|
+| **Agent** | A *persona* — "You are a Senior Specs Developer" | Explicit invocation | `specs-developer` |
+| **Skill** | *Procedural knowledge* — "When doing X, follow these rules" | On-demand, when task matches | `specs-management` |
+
+## Guidelines for Adding New Skills
+
+1. Create a directory in `.agents/skills/` with a descriptive name.
+2. Add a `SKILL.md` file with YAML frontmatter (`name`, `description`) and XML-sectioned content.
+3. The `description` field should clearly state *when* the skill should be invoked.
+4. Document the skill in this `SKILLS.md` file.
