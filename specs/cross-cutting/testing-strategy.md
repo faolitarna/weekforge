@@ -3,9 +3,9 @@ id: WF-TEST
 title: Testing Strategy
 status: not-started
 version: 0.1
-last-updated: 2026-04-10
+last-updated: 2026-04-11
 depends-on: [WF-OBS]
-implements-phase: []
+implements-phase: [1, 2, 3, 4]
 ---
 
 # Testing Strategy

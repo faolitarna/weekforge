@@ -14,12 +14,7 @@ implements-phase: [0, 1, 2, 3, 4]
 
 **Goal:** Establish a working LangGraph project with all integrations verified end-to-end before any feature work begins.
 
-- Project scaffold — Python project structure, dependency management, virtual environment
-- LangGraph hello-world graph — a minimal state graph with one node, one checkpoint, and one HITL interrupt to validate the framework works
-- Notion API integration — connect to the existing Notion workspace, verify CRUD operations against a test database
-- Secrets management — API keys (LLM providers, Notion) stored securely, never in source control
-- Model abstraction layer — basic Tier-1/Tier-2 provider switching so the first real feature can already use tiered intelligence
-- CLI skeleton — minimal entry point using rich terminal libraries, validating the developer experience
+**Detailed specification:** [WF-00 — System Overview & Architecture](./00-system-overview.md) (§3-§8) defines all infrastructure contracts, tooling standards, and validation sub-milestones (0a → 0b → 0c → 0d) for this phase.
 
 **Exit criteria:** A runnable graph that loads data from Notion, passes it through an LLM node, pauses for HITL input, and writes a result back to Notion. All infrastructure decisions validated before committing to feature development.
 

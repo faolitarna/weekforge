@@ -3,9 +3,9 @@ id: WF-PROMPT
 title: Prompt Architecture
 status: not-started
 version: 0.1
-last-updated: 2026-04-10
-depends-on: []
-implements-phase: []
+last-updated: 2026-04-11
+depends-on: [WF-00]
+implements-phase: [1, 2, 3]
 ---
 
 # Prompt Architecture
