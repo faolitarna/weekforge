@@ -1,0 +1,1 @@
+"""Weekforge package."""
