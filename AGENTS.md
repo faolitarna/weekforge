@@ -10,7 +10,42 @@ The definitions for these agents are located in the `.agents/agents/` directory.
 - **Path**: `.agents/agents/specs-developer/specs-developer.md`
 - **Role**: Specs Developer — System Architect for Agentic Patterns.
 - **Usage**: Use this agent to analyze legacy code and generate formal architectural specs based strictly on theoretical agentic patterns (like Google's Agentic Design Patterns), without writing implementation code.
-- **How to invoke**: Ask your AI IDE: *"Adopt the `specs-developer` agent from `.agents/agents/specs-developer/specs-developer.md`. Read the legacy code in [folder], cross-reference it with `references/agentic-design-patterns-guide.md`, and generate an SDD Spec."*
+- **How to invoke**: *"Adopt the `specs-developer` agent. Read the legacy code in [folder], cross-reference it with `references/agentic-design-patterns-guide.md`, and generate an SDD Spec."*
+
+### Feature Developer
+- **Path**: `.agents/agents/feature-developer/feature-developer.md`
+- **Role**: Senior Python Engineer — LangGraph, Notion API, training domain specialist.
+- **Usage**: Use this agent to implement step specs. Reads the spec, builds bottom-up (models → tools → graph → CLI), narrates every design decision, and self-verifies against acceptance criteria.
+- **How to invoke**: *"Adopt the `feature-developer` agent. Implement step [step-XX] from `specs/steps/step-XX-name.md`."*
+
+### Feature Tester
+- **Path**: `.agents/agents/feature-tester/feature-tester.md`
+- **Role**: QA Engineer — pytest specialist, pragmatic test strategist.
+- **Usage**: Use this agent to review an implementation and write focused, high-value tests. Always reasons about whether each test justifies its existence in a personal project. Keeps the test suite small and sharp.
+- **How to invoke**: *"Adopt the `feature-tester` agent. Review the implementation of step [step-XX] and write tests."*
+
+### Code Reviewer
+- **Path**: `.agents/agents/code-reviewer/code-reviewer.md`
+- **Role**: Senior Engineer — pre-commit quality gate for solo trunk-based development.
+- **Usage**: Use this agent before committing. Reviews for spec compliance, architectural consistency, type safety, and testing adequacy. Provides a structured report with blockers/warnings/suggestions and a commit message.
+- **How to invoke**: *"Adopt the `code-reviewer` agent. Review the implementation of step [step-XX] before commit."*
+
+## Recommended Workflow
+
+The four agents form a natural development cycle for a solo developer:
+
+```
+specs-developer → feature-developer → feature-tester → code-reviewer → commit
+```
+
+| Phase | Agent | Output |
+|-------|-------|--------|
+| 1. Specify | `specs-developer` | Step spec with acceptance criteria |
+| 2. Build | `feature-developer` | Implementation + accompanying tests |
+| 3. Test | `feature-tester` | Focused test suite + coverage assessment |
+| 4. Review | `code-reviewer` | Structured review report + commit message |
+
+**Git strategy**: Trunk-based development (direct commits to `main`). The code-reviewer agent replaces PR reviews. Atomic commits with conventional format: `feat(step-0b): implement Notion tool layer`.
 
 ## Agents vs Skills
 
