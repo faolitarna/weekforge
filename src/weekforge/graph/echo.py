@@ -3,6 +3,7 @@ import sqlite3
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import interrupt
 
 from weekforge.models.state import State
 
@@ -41,20 +42,18 @@ checkpointer = SqliteSaver(conn)
 # because we want to see it pause and resume, or maybe *after* our node?
 # Usually, HITL confirms an action. The prompt schema says:
 # A["Entry"] --> B["Echo Node"] --> C{"HITL: Confirm"} --> D["Complete"].
-# This means we should have a dummy "complete" node or just interrupt before END.
-# Since we can't easily interrupt before END directly using node names unless we have one,
-# let's add a `complete` node.
-
-def complete_node(state: State) -> dict[str, str]:
-    """Node that runs after HITL confirmation."""
+def hitl_review(state: State) -> dict[str, str]:
+    """Node that explicitly pauses using the interrupt API."""
+    human_decision = interrupt({
+        "action": "confirm_echo",
+        "message": state.message
+    })
     return {}
 
-workflow.add_node("complete", complete_node)
-workflow.add_edge("echo_logic", "complete")
-workflow.add_edge("complete", END)
+workflow.add_node("hitl_review", hitl_review)
+workflow.add_edge("echo_logic", "hitl_review")
+workflow.add_edge("hitl_review", END)
 
-# Compile and interrupt before the complete node (the HITL point)
 app = workflow.compile(
     checkpointer=checkpointer,
-    interrupt_before=["complete"]
 )

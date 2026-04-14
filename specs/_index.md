@@ -7,7 +7,7 @@
 | # | Step | Description | Status |
 |---|------|-------------|--------|
 | 0a | [Minimal Graph](./steps/step-0a-minimal-graph.md) | LangGraph hello world: state, node, HITL, checkpoint | ✅ |
-| 0b | [Notion Tools](./steps/step-0b-notion-tools.md) | Notion tool layer: CRUD contracts + integration | ⬜ |
+| 0b | [Notion Tools](./steps/step-0b-notion-tools.md) | Notion tool layer: CRUD contracts + integration | ✅ |
 | 0c | [LLM Integration](./steps/step-0c-llm-integration.md) | Model config, LLM calls, metadata capture | ⬜ |
 | 0d | [End-to-End](./steps/step-0d-end-to-end.md) | Full loop: Notion -> LLM -> HITL -> Notion + CLI | ⬜ |
 | 1 | [Extraction](./steps/step-1-extraction.md) | `summarize_week` — first real feature | ⬜ |

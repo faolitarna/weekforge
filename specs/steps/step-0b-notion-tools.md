@@ -96,14 +96,14 @@ Startup validation now checks `NOTION_TOKEN` is present and non-empty.
 
 ## Acceptance Criteria
 
-- [ ] `NOTION_TOKEN` loaded from `.env`, validated at startup
-- [ ] `query()` returns structured records from a real Notion database
-- [ ] `fetch()` returns page properties + block content
-- [ ] `create()` writes a new page, returns page ID
-- [ ] `update()` modifies an existing page idempotently
-- [ ] Rate limiting handled transparently (backoff + retry)
-- [ ] Test graph: read from Notion, display via Rich table, write back, verify in Notion UI
-- [ ] Checkpoint persistence works across terminal sessions
+- [x] `NOTION_TOKEN` loaded from `.env`, validated at startup
+- [x] `query()` returns structured records from a real Notion database
+- [x] `fetch()` returns page properties + block content
+- [x] `create()` writes a new page, returns page ID
+- [x] `update()` modifies an existing page idempotently
+- [x] Rate limiting handled transparently (backoff + retry)
+- [x] Test graph: read from Notion, display via Rich table, write back, verify in Notion UI
+- [x] Checkpoint persistence works across terminal sessions
 
 ## Reference
 
