@@ -30,12 +30,18 @@ The definitions for these agents are located in the `.agents/agents/` directory.
 - **Usage**: Use this agent before committing. Reviews for spec compliance, architectural consistency, type safety, and testing adequacy. Provides a structured report with blockers/warnings/suggestions and a commit message.
 - **How to invoke**: *"Adopt the `code-reviewer` agent. Review the implementation of step [step-XX] before commit."*
 
+### Documentation Developer
+- **Path**: `.agents/agents/documentation-developer/documentation-developer.md`
+- **Role**: Senior Technical Writer + Domain Expert — explains code intent for learning.
+- **Usage**: Use this agent to add inline documentation to code. Documents intent and decisions, not fundamentals. Keeps documentation concise and action-oriented.
+- **How to invoke**: *"Adopt the `documentation-developer` agent. Document the implementation of step [step-XX]."*
+
 ## Recommended Workflow
 
-The four agents form a natural development cycle for a solo developer:
+The five agents form a natural development cycle for a solo developer:
 
 ```
-specs-developer → feature-developer → feature-tester → code-reviewer → commit
+specs-developer → feature-developer → feature-tester → code-reviewer → documentation-developer → commit
 ```
 
 | Phase | Agent | Output |
@@ -44,8 +50,9 @@ specs-developer → feature-developer → feature-tester → code-reviewer → c
 | 2. Build | `feature-developer` | Implementation + accompanying tests |
 | 3. Test | `feature-tester` | Focused test suite + coverage assessment |
 | 4. Review | `code-reviewer` | Structured review report + commit message |
+| 5. Document | `documentation-developer` | Inline docstrings explaining intent |
 
-**Git strategy**: Trunk-based development (direct commits to `main`). The code-reviewer agent replaces PR reviews. Atomic commits with conventional format: `feat(step-0b): implement Notion tool layer`.
+**Git strategy**: Trunk-based development (direct commits to `main`). The code-reviewer agent replaces PR reviews. The documentation-developer agent adds inline docs before commit. Atomic commits with conventional format: `feat(step-0b): implement Notion tool layer`.
 
 ## Agents vs Skills
 
