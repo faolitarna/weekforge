@@ -12,22 +12,23 @@ Step 2 complete (planning engine, approved `week_plan` in state).
 
 | File | Purpose |
 |------|---------|
-| `src/weekforge/graph/generation.py` | Generation loop (Lifecycle A, part 2) |
-| `src/weekforge/graph/evaluator.py` | Deterministic Evaluator (Tier-0 Python validation) |
-| `src/weekforge/tools/generation.py` | Session writing tool nodes (idempotent Notion writes) |
-| `src/weekforge/models/state.py` | Extend state with generation-specific fields |
+| `src/weekforge/workflows/generation.py` | Generation loop (Lifecycle A, part 2) |
+| `src/weekforge/workflows/evaluator.py` | Deterministic Evaluator (Tier-0 Python validation) |
+| `src/weekforge/tools/generation.py` | Session writing tool functions (idempotent Notion writes) |
+| `src/weekforge/agents/agents.py` | Add `generation_agent` definition |
+| `src/weekforge/models/state.py` | Extend with generation-specific state model |
 
 ## Specification
 
 ### Overview
 
-On plan approval (step 2), the graph automatically loops over the session array. Each session is drafted (Tier-2 LLM), passed through the Deterministic Evaluator (Tier-0 Python), then paused for HITL review. On approval, the session is written to Notion and the next is drafted automatically.
+On plan approval (step 2), the workflow automatically loops over the session array. Each session is drafted (Tier-2 agent), passed through the Deterministic Evaluator (Tier-0 Python), then paused for HITL review. On approval, the session is written to Notion and the next is drafted automatically.
 
-### Graph Topology (Generation Phase)
+### Workflow (Generation Phase)
 
 ```mermaid
 graph TD
-    E["From Plan Approval"] --> F["Draft Session\n(Tier-2 LLM)"]
+    E["From Plan Approval"] --> F["Draft Session\n(Tier-2 Agent)"]
     F --> G["Deterministic Evaluator\n(Tier-0 Python)"]
     G -->|"validation fails\n(retry <= max)"| F
     G -->|"circuit breaker\n(retry > max)"| H
@@ -36,6 +37,43 @@ graph TD
     H -->|"user approves"| I["Write to Notion\n(idempotent)"]
     I -->|"written < total"| F
     I -->|"written == total"| J["Complete"]
+```
+
+Nested loops — outer `for` over sessions, inner `while` for evaluator retries:
+
+```python
+def run_generation(state: GenerationState, checkpoint: CheckpointStore, thread_id: str):
+    for i in range(state.current_session_index, state.sessions_total + 1):
+        state.current_session_index = i
+        
+        # Draft-evaluate loop
+        retry_count = 0
+        feedback = None
+        while True:
+            result = generation_agent.run_sync(
+                user_prompt=format_session_prompt(state, i, feedback),
+            )
+            draft = result.data
+            run_cost.add(result)
+            
+            # Deterministic evaluator (Tier-0)
+            eval_result = evaluate_session(draft, state)
+            if eval_result.passed or retry_count >= MAX_RETRIES:
+                break
+            feedback = eval_result.errors
+            retry_count += 1
+        
+        # HITL review (pre-validated or circuit-breaker with warning)
+        decision = hitl_session_review(draft, eval_result, checkpoint, thread_id, ...)
+        if decision.approved:
+            page_id = write_session_idempotent(state, draft)
+            state.written_sessions.append({"page_id": page_id, "session_name": draft.name})
+            checkpoint.save(thread_id, "generation", f"session_{i}_written", state)
+        elif decision.feedback:
+            feedback = decision.feedback
+            continue  # re-draft with human feedback
+    
+    checkpoint.delete(thread_id)
 ```
 
 ### Edge Conditions
@@ -77,10 +115,10 @@ The Evaluator checks for **presence and structure** of reasoning, not quality. Q
 ### State Fields Used
 
 **Layer C (Output, accumulated):**
-- `current_session_index` — Which session we're drafting (1-based), Replace reducer
-- `current_draft` — Current draft being reviewed — ephemeral, Replace reducer
-- `written_sessions` — Lightweight references `{page_id, session_name}`, **Append reducer** (critical for checkpoint safety)
-- `focus_exercise_count` — Running tally vs 8+ target, Replace reducer
+- `current_session_index` — Which session we're drafting (1-based)
+- `current_draft` — Current draft being reviewed — ephemeral local variable, not checkpointed
+- `written_sessions` — Lightweight references `{page_id, session_name}`, plain `list.append()`
+- `focus_exercise_count` — Running tally vs 8+ target
 
 ### Idempotent Writes
 
@@ -98,13 +136,13 @@ All Notion writes check if the target session (matching name + week) already exi
 ## Acceptance Criteria
 
 - [ ] After plan approval, generation loop starts automatically
-- [ ] Tier-2 LLM drafts each session with reasoning block
+- [ ] Tier-2 agent drafts each session with reasoning block (structured `result_type`)
 - [ ] Deterministic Evaluator validates every draft (structural, guardrails, context grounding)
 - [ ] Failed validation auto-retries with specific error feedback
 - [ ] Circuit breaker triggers after max retries, surfaces draft with warning
 - [ ] HITL: user can approve or provide feedback for re-draft
 - [ ] Approved sessions written to Notion idempotently
-- [ ] `written_sessions` append reducer persists across checkpoint resume
+- [ ] `written_sessions` list persists correctly across checkpoint resume
 - [ ] Auto-progression: after writing, next session drafts automatically
 - [ ] Completion when `len(written_sessions) == sessions_total`
 - [ ] Full end-to-end: plan -> approve plan -> draft all sessions -> write all to Notion
@@ -114,5 +152,5 @@ All Notion writes check if the target session (matching name + week) already exi
 ## Reference
 
 - [Patterns](../reference/patterns.md) — Evaluator-Optimizer (Two-Stage Validation Gate)
-- [State Schema](../reference/state-schema.md) — Layer C output state, reducers
+- [State Schema](../reference/state-schema.md) — Layer C output state
 - [Failure Modes](../reference/failure-modes.md) — LLM output failures, circuit breaker

@@ -2,9 +2,11 @@
 
 ## System Overview & Legacy Context
 
-The Weekforge project migrates legacy declarative text-based recipes (used manually with Claude Code) into a robust, deterministic graph-based application using **LangGraph**. The migration introduces Agentic Patterns, optimizes token usage via Python tooling, constructs a rich local CLI environment, and employs model-agnostic routing to balance cost and cognitive power.
+The Weekforge project migrates legacy declarative text-based recipes (used manually with Claude Code) into a structured workflow application using **Pydantic AI** for LLM integration and **plain Python** for orchestration. The migration introduces Agentic Patterns, optimizes token usage via Python tooling, constructs a rich local CLI environment, and employs model-agnostic routing to balance cost and cognitive power.
 
 **Agentic Complexity Level: 2 — Strategic Problem-Solver** (per Agentic Design Patterns Guide). Weekforge uses Context Engineering as a systematic discipline — strategically curating the model's context through PLAN_STATE, 3-week feedback windows, and summary-first loading. It implements automated feedback loops (Evaluator-Optimizer) for self-improvement of output quality. It does **not** reach Level 3 (Collaborative Multi-Agent) — there is a single reasoning agent. This is intentional: multi-agent coordination adds complexity without benefit for a single-user, single-domain workflow.
+
+**Framework choice (DEC-004):** Every workflow is a sequential pipeline with at most one loop. Plain Python `async def` functions with `for`/`while`/`if` handle orchestration. Pydantic AI handles LLM calls with structured output validation and model-agnostic bindings. A lightweight custom checkpoint store (~60 lines) handles CLI session persistence.
 
 ## Intelligence Tiering & Task Abstraction
 
@@ -20,7 +22,7 @@ The Weekforge project migrates legacy declarative text-based recipes (used manua
 | `fast` | Tier 1 | Routing, classification | `gpt-5.4-nano` |
 | `reasoning` | Tier 2 | Planning, generation, synthesis | `gpt-5.4` |
 
-Node code references task classes (`fast`, `reasoning`), never specific model names. Swapping a model means changing one config entry.
+Agent and workflow code references task classes (`fast`, `reasoning`), never specific model names. Swapping a model means changing one config entry.
 
 ### Model Configuration Structure
 
@@ -38,9 +40,11 @@ models:
     temperature: 0.7
 ```
 
+Task classes resolve to Pydantic AI model strings (e.g., `"openai:gpt-5.4"`). Agents are instantiated with `Agent(model=get_model("reasoning"), ...)`.
+
 ### Response Metadata
 
-Every LLM call returns metadata: `model_used`, `latency_ms`, `input_tokens`, `output_tokens`, `estimated_cost`. A `run_cost` field in graph state accumulates cost from every LLM call during a run — the CLI displays the total at completion.
+Every LLM call returns metadata via Pydantic AI's `result.cost()`: `request_tokens`, `response_tokens`, `total_tokens`. Latency is captured via a timing wrapper. A `RunCost` accumulator tracks cost from every LLM call during a workflow run — the CLI displays the total at completion.
 
 ## Generic Notion Tool Layer
 
@@ -111,6 +115,14 @@ Every interrupt renders a Rich panel with: **Context** (what you're looking at),
 - **Ruff** — Linting and formatting
 - **mypy** — Static type checking in strict mode
 
+### Key Dependencies
+
+- **Pydantic AI** — LLM agent framework (structured output, model-agnostic bindings)
+- **Pydantic** — Data validation and state schemas
+- **Typer + Rich** — CLI framework and terminal UI
+- **Notion Client** — Notion API SDK
+- **Tenacity** — Retry logic for Notion tool layer
+
 ### Project Layout
 
 ```
@@ -118,11 +130,14 @@ weekforge/
 ├── src/
 │   └── weekforge/
 │       ├── __init__.py
-│       ├── cli.py          # Typer application entry point
-│       ├── graph/           # LangGraph graph definitions
-│       ├── tools/           # Notion tool layer + other tools
-│       ├── config/          # Model config, env loading
-│       └── models/          # State schemas, data models
+│       ├── cli.py            # Typer application entry point
+│       ├── checkpoint.py     # SQLite checkpoint store
+│       ├── hitl.py           # HITL presentation helpers
+│       ├── workflows/        # Orchestrator functions (plain Python)
+│       ├── agents/           # Pydantic AI agent definitions
+│       ├── tools/            # Notion tool layer + other tools
+│       ├── config/           # Model config, env loading
+│       └── models/           # State schemas, result types
 ├── tests/
 ├── pyproject.toml
 ├── uv.lock

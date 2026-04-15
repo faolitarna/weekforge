@@ -12,9 +12,10 @@ Step 0d complete (all infrastructure validated end-to-end).
 
 | File | Purpose |
 |------|---------|
-| `src/weekforge/graph/extraction.py` | Extraction graph (Lifecycle B) |
-| `src/weekforge/tools/extraction.py` | Feature-specific tool nodes (query sessions, parse blocks) |
-| `src/weekforge/models/state.py` | Extend state schema with extraction-specific fields |
+| `src/weekforge/workflows/extraction.py` | Extraction workflow (Lifecycle B) |
+| `src/weekforge/tools/extraction.py` | Feature-specific tool functions (query sessions, parse blocks) |
+| `src/weekforge/agents/agents.py` | Add `summarize_agent` definition |
+| `src/weekforge/models/state.py` | Extend with extraction-specific state model |
 | Updates to `cli.py` | Wire `weekforge summarize` command |
 
 ## Specification
@@ -23,7 +24,7 @@ Step 0d complete (all infrastructure validated end-to-end).
 
 `summarize_week` runs independently and on-demand after the physical training week is complete. It aggregates executed sessions, extracts feedback, calculates adherence, and updates the global PLAN_STATE.
 
-### Graph Topology
+### Workflow
 
 ```mermaid
 graph TD
@@ -31,10 +32,43 @@ graph TD
     B --> C{"HITL:\nVerify Sessions"}
     C -->|"user confirms"| D["Extract Data\n(Tier-0 Parser)"]
     D --> E{"HITL:\nVerify Extraction"}
-    E -->|"user confirms"| F["Generate Summary\n(Tier-2 LLM)"]
+    E -->|"user confirms"| F["Generate Summary\n(Tier-2 Agent)"]
     F --> G["Write Summary\n(Notion Tool)"]
     G --> H["Update PLAN_STATE\n(Incremental/Bootstrap)"]
     H --> I["Complete"]
+```
+
+Plain function with two HITL checkpoints:
+
+```python
+def run_extraction(week_target: int, checkpoint: CheckpointStore, thread_id: str):
+    # 1. Query sessions (Tier-0, Notion tools)
+    sessions = notion.query(db_id, filters_for_week(week_target))
+    
+    # 2. HITL: verify sessions
+    decision = hitl_verify(sessions, checkpoint, thread_id, ...)
+    if not decision.approved:
+        return  # checkpointed, user quit
+    
+    # 3. Extract data (Tier-0, Python parser)
+    extracted = parse_sessions(sessions)
+    
+    # 4. HITL: verify extraction
+    decision = hitl_verify(extracted, checkpoint, thread_id, ...)
+    if not decision.approved:
+        return
+    
+    # 5. Generate summary (Tier-2, Pydantic AI agent)
+    result = summarize_agent.run_sync(user_prompt=format_extraction(extracted))
+    run_cost.add(result)
+    
+    # 6. Write summary (Tier-0, Notion tools)
+    notion.create(summary_db_id, ..., result.data.summary_markdown)
+    
+    # 7. Update PLAN_STATE
+    update_plan_state(week_target, result.data)
+    
+    checkpoint.delete(thread_id)
 ```
 
 ### Edge Conditions
@@ -46,7 +80,7 @@ graph TD
 | HITL Verify Sessions | Extract Data | User confirms |
 | Extract Data | HITL Verify Extraction | Data completeness check displayed |
 | HITL Verify Extraction | Generate Summary | User confirms extraction is complete |
-| Generate Summary | Write Summary | Summary generated (Tier-2 LLM) |
+| Generate Summary | Write Summary | Summary generated (Tier-2 agent) |
 | Write Summary | Update PLAN_STATE | Summary written to Notion |
 | Update PLAN_STATE | Complete | PLAN_STATE updated |
 
@@ -70,7 +104,7 @@ Session data extraction is pure Python (Tier-0):
 - Parse Notion `to_do` blocks — extract exercise names, sets/reps/weight, checked state
 - Parse comments — extract freeform feedback
 - Parse properties — extract session metadata (date, type, duration)
-- Week prefix formatting: always zero-padded (`f"W{week_target:02d}"`), computed by tool node
+- Week prefix formatting: always zero-padded (`f"W{week_target:02d}"`), computed by tool function
 
 ### Failure Handling
 
@@ -81,12 +115,12 @@ Session data extraction is pure Python (Tier-0):
 
 ## Acceptance Criteria
 
-- [ ] `weekforge summarize` starts the extraction graph
+- [ ] `weekforge summarize` starts the extraction workflow
 - [ ] Sessions queried from Notion for the target week
 - [ ] HITL: user verifies correct sessions before extraction
 - [ ] Tier-0 parser extracts structured data from Notion blocks
 - [ ] HITL: user verifies extraction completeness
-- [ ] Tier-2 LLM generates weekly summary with feedback
+- [ ] Tier-2 agent generates weekly summary with feedback (structured `result_type`)
 - [ ] Summary written to Notion
 - [ ] PLAN_STATE updated (incremental) or created (bootstrap)
 - [ ] Checkpoint persistence works across terminal sessions

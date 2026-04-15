@@ -6,7 +6,7 @@ Validate the Notion Tool Layer — connect, query, display, and write back.
 
 ## Prerequisites
 
-Step 0a complete (project structure, LangGraph basics, CLI shell).
+Step 0a complete (project structure, checkpoint store, HITL helpers, CLI shell).
 
 ## What You're Building
 
@@ -14,7 +14,7 @@ Step 0a complete (project structure, LangGraph basics, CLI shell).
 |------|---------|
 | `src/weekforge/tools/notion.py` | Generic Notion tool layer (query, fetch, create, update) |
 | `src/weekforge/config/env.py` | Environment loading + startup validation |
-| `src/weekforge/graph/notion_test.py` | Test graph: query Notion -> HITL verify -> write back |
+| `src/weekforge/workflows/notion_test.py` | Test workflow: query Notion -> HITL verify -> write back |
 
 ## Specification
 
@@ -71,7 +71,7 @@ Update operations are **idempotent** — same data multiple times produces the s
 
 Rate limiting is the only error with automatic retry. All other errors surface to the calling node.
 
-### Test Graph
+### Test Workflow
 
 ```mermaid
 graph TD
@@ -81,6 +81,7 @@ graph TD
     D --> E["Complete"]
 ```
 
+- Plain function: query -> HITL verify (using `hitl.py` helpers) -> write
 - Query a test database, display results via Rich table
 - Write a test page back to Notion
 - Validate all four CRUD operations work
@@ -102,7 +103,7 @@ Startup validation now checks `NOTION_TOKEN` is present and non-empty.
 - [x] `create()` writes a new page, returns page ID
 - [x] `update()` modifies an existing page idempotently
 - [x] Rate limiting handled transparently (backoff + retry)
-- [x] Test graph: read from Notion, display via Rich table, write back, verify in Notion UI
+- [x] Test workflow: read from Notion, display via Rich table, write back, verify in Notion UI
 - [x] Checkpoint persistence works across terminal sessions
 
 ## Reference
