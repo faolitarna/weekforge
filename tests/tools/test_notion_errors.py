@@ -68,7 +68,7 @@ def test_retry_api_call_rate_limit_gives_up(mocker):
 def test_api_call_404_mapping():
     """
     Test that 404 maps to NotionNotFoundError immediately.
-    Why: Domain-specific errors keep the graph logic clean.
+    Why: Domain-specific errors keep workflow logic clean.
     """
     def mock_not_found():
         raise mock_api_response_error(404, "object_not_found")

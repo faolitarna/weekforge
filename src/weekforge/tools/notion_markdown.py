@@ -1,18 +1,18 @@
+"""Narrow markdown-to-Notion-blocks converter — only what session drafts need.
+
+Supports: h1/h2/h3 headings, checked/unchecked to-do items, bullets, paragraphs.
+No inline rich text. Unrecognised lines silently become paragraphs.
+"""
 from typing import Any
 
 
 def convert_markdown_to_blocks(content: str) -> list[dict[str, Any]]:
-    """
-    Converts simple markdown text into Notion block objects.
-    Supports headings, checkboxes, bulleted lists, and paragraphs.
-    Rich text formatting (bold, italic) within lines is not supported in this rudimentary parser.
-    """
     if not content:
         return []
 
     blocks = []
     lines = content.split('\n')
-    
+
     for line in lines:
         line_stripped = line.strip()
         if not line_stripped:

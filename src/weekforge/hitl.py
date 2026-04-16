@@ -26,6 +26,11 @@ def hitl_confirm(
     state: BaseModel,
     options: str = "- [green]Yes[/green]: Proceed\n- [red]No[/red]: Keep paused (resume later with --thread-id)",
 ) -> HitlDecision:
+    """Saves state, renders a Context/Options/Recommendation panel, returns user decision.
+
+    State is saved BEFORE the prompt — crash safety. The `step` label persists to
+    SQLite; renaming it breaks resume for any in-flight checkpoints.
+    """
     checkpoint.save(thread_id, workflow, step, state)
 
     content = (

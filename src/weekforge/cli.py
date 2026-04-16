@@ -1,3 +1,12 @@
+"""Weekforge CLI — Typer entry point for all user-facing workflow commands.
+
+Commands are thin wrappers: construct a CheckpointStore, delegate to the workflow
+function, handle KeyboardInterrupt by printing a resume hint. All rendering and
+HITL logic lives in the workflow and hitl modules.
+
+Invoking `weekforge` bare shows help plus active checkpoint status — the user
+never has to remember thread IDs or which workflow was in progress.
+"""
 import uuid
 
 import typer
@@ -10,6 +19,7 @@ from weekforge.checkpoint import CheckpointStore
 app = typer.Typer(help="Weekforge — training week lifecycle manager.")
 console = Console()
 
+# Relative to CWD — each project directory gets its own isolated checkpoint DB.
 _DEFAULT_DB_PATH = ".weekforge/checkpoints.sqlite"
 
 

@@ -2,14 +2,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """
-    Application settings loaded from environment variables or .env file.
-    
-    Using pydantic_settings enforces our "Fail fast, fail loud" architectural pattern.
-    If a required environment variable is missing or incorrectly typed, the application
-    will crash immediately at startup with a clear validation error, rather than failing
-    deep inside a tool or graph node.
-    """
     notion_token: str
     notion_test_db_id: str
 
@@ -19,6 +11,7 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-# Load settings immediately upon import.
-# This ensures fail-fast validation at app startup.
+
+# Module-level instantiation = fail-fast: missing vars crash at import, not inside a workflow.
+# Side effect: tests that import this module require a .env or env vars to be set.
 settings = Settings()  # type: ignore[call-arg]

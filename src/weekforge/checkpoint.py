@@ -18,6 +18,7 @@ class CheckpointRecord:
 class CheckpointStore:
     def __init__(self, db_path: str = ".weekforge/checkpoints.sqlite") -> None:
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+        # check_same_thread=False: Typer and pytest may access from different threads.
         self._conn = sqlite3.connect(db_path, check_same_thread=False)
         self._conn.execute("""
             CREATE TABLE IF NOT EXISTS checkpoints (
@@ -31,6 +32,11 @@ class CheckpointStore:
         self._conn.commit()
 
     def save(self, thread_id: str, workflow: str, step: str, state: BaseModel) -> None:
+        """Persist state before a HITL pause.
+
+        Must be called BEFORE rendering the prompt — crash safety relies on the
+        checkpoint existing before the user sees the question.
+        """
         now = datetime.now(UTC).isoformat()
         self._conn.execute(
             """
@@ -62,5 +68,6 @@ class CheckpointStore:
         return [CheckpointRecord(*row) for row in rows]
 
     def delete(self, thread_id: str) -> None:
+        # Absence of a checkpoint = workflow finished. Call this on successful completion.
         self._conn.execute("DELETE FROM checkpoints WHERE thread_id = ?", (thread_id,))
         self._conn.commit()

@@ -1,3 +1,13 @@
+"""Step-0b integration smoke test — exercises the full Notion CRUD cycle.
+
+Not a unit test: requires a real Notion token and a writable test database.
+Validates that query → HITL → create → update works end-to-end before any
+production workflow depends on the tool layer.
+
+Flow: query records → render Rich table → HITL pause → (on approval) create +
+update a test page → delete checkpoint. On Ctrl-C or "No", state is checkpointed
+and the run resumes at the HITL step next time.
+"""
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -10,16 +20,32 @@ from weekforge.tools import notion
 
 _console = Console()
 _WORKFLOW = "notion_test"
+# Persisted in the checkpoint row — must stay stable or existing paused runs break.
 _STEP_REVIEWED = "reviewed"
 
 
 class NotionTestState(BaseModel):
+    """State for the Notion CRUD smoke test workflow.
+
+    `created_page_id` is the idempotency anchor for a post-write crash: if the
+    process dies after create() but before delete(), a future resume would re-run
+    create(). The current implementation does not guard against this — known
+    limitation documented in patterns.md §Idempotent writes.
+    """
     database_id: str
     records: list[dict[str, Any]] = Field(default_factory=list)
     created_page_id: str | None = None
 
 
 def run_notion_test(database_id: str, thread_id: str, store: CheckpointStore) -> None:
+    """Run or resume the Notion CRUD smoke test for the given thread.
+
+    Two-phase flow:
+      Phase 1 (pre-HITL): query the database and render a sample table.
+        On resume from checkpoint, the query is skipped — stored records are shown.
+      Phase 2 (post-approval): create a test page then immediately update it.
+        Validates both write operations work before any production workflow calls them.
+    """
     record = store.load(thread_id)
     if record is not None:
         state = NotionTestState.model_validate_json(record.state_json)
@@ -66,6 +92,7 @@ def run_notion_test(database_id: str, thread_id: str, store: CheckpointStore) ->
 
 
 def _render_records_table(records: list[dict[str, Any]]) -> None:
+    # Shows up to 3 records — this is a preview for HITL confirmation, not the full result.
     table = Table(title="Queried Notion Records")
     table.add_column("Record ID", style="cyan")
     table.add_column("URL", style="magenta")
