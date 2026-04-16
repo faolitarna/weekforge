@@ -59,8 +59,7 @@ cover/
 *.sqlite
 *.sqlite3
 *.db
-.langserve/
-.langgraph/
+.weekforge/
 chroma.sqlite3
 vectorstore/
 

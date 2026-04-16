@@ -6,7 +6,7 @@
 
 | # | Step | Description | Status |
 |---|------|-------------|--------|
-| 0a | [Minimal Workflow](./steps/step-0a-minimal-workflow.md) | Workflow foundation: state, checkpoint, HITL, Pydantic AI | 🔄 |
+| 0a | [Minimal Workflow](./steps/step-0a-minimal-workflow.md) | Workflow foundation: state, checkpoint, HITL, Pydantic AI | ✅ |
 | 0b | [Notion Tools](./steps/step-0b-notion-tools.md) | Notion tool layer: CRUD contracts + integration | ✅ |
 | 0c | [LLM Integration](./steps/step-0c-llm-integration.md) | Pydantic AI agent setup, model config, metadata capture | ⬜ |
 | 0d | [End-to-End](./steps/step-0d-end-to-end.md) | Full loop: Notion -> Agent -> HITL -> Notion + CLI | ⬜ |

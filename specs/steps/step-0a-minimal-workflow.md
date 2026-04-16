@@ -140,14 +140,14 @@ Startup validation: check all required env vars are present and non-empty. For 0
 
 ## Acceptance Criteria
 
-- [ ] `uv sync` installs all dependencies
-- [ ] `uv run weekforge` shows available commands
-- [ ] `uv run weekforge echo` starts the workflow, shows echo output, pauses at HITL
-- [ ] User can confirm at HITL, workflow completes
-- [ ] Close terminal, reopen, run `weekforge echo` — workflow resumes at HITL checkpoint
-- [ ] `CheckpointStore` persists and restores Pydantic models correctly
-- [ ] `uv run ruff check .` passes
-- [ ] `uv run mypy src/` passes
+- [x] `uv sync` installs all dependencies
+- [x] `uv run weekforge` shows available commands
+- [x] `uv run weekforge echo` starts the workflow, shows echo output, pauses at HITL
+- [x] User can confirm at HITL, workflow completes
+- [x] Close terminal, reopen, run `weekforge echo` — workflow resumes at HITL checkpoint
+- [x] `CheckpointStore` persists and restores Pydantic models correctly
+- [x] `uv run ruff check .` passes
+- [x] `uv run mypy src/` passes
 
 ## Reference
 
