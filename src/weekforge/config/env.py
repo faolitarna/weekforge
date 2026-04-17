@@ -4,6 +4,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     notion_token: str
     notion_test_db_id: str
+    openai_api_key: str
+    fast_profile: str = "gpt-5.4-nano"
+    reasoning_profile: str = "gpt-5.4"
+    caveman_mode: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",

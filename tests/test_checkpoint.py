@@ -1,5 +1,5 @@
 from weekforge.checkpoint import CheckpointStore
-from weekforge.models.state import State
+from weekforge.models.workflow_state import State
 
 
 def _mem_store() -> CheckpointStore:

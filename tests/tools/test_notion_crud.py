@@ -1,7 +1,7 @@
 
 import pytest
 
-from weekforge.tools.notion import NotionAPIError, fetch, query
+from weekforge.tools.notion_api_gateway import NotionAPIError, fetch, query
 
 
 def test_query_resolves_data_source(mocker):
@@ -10,8 +10,8 @@ def test_query_resolves_data_source(mocker):
     and then queries that data_source_id.
     Why: SDK 3.0.0 uses data_sources. We want to ensure database_id is resolved properly.
     """
-    mock_db_retrieve = mocker.patch("weekforge.tools.notion._client.databases.retrieve")
-    mock_ds_query = mocker.patch("weekforge.tools.notion._client.data_sources.query")
+    mock_db_retrieve = mocker.patch("weekforge.tools.notion_api_gateway._client.databases.retrieve")
+    mock_ds_query = mocker.patch("weekforge.tools.notion_api_gateway._client.data_sources.query")
     
     # Mock database retrieve returning a connected data source
     mock_db_retrieve.return_value = {
@@ -42,7 +42,7 @@ def test_query_fails_on_missing_data_source(mocker):
     Test that query() throws a NotionAPIError if the retrieved database lacks a data source.
     Why: Assures missing or misconfigured schemas don't cause obscure KeyErrors later.
     """
-    mock_db_retrieve = mocker.patch("weekforge.tools.notion._client.databases.retrieve")
+    mock_db_retrieve = mocker.patch("weekforge.tools.notion_api_gateway._client.databases.retrieve")
     
     # Return a malformed database with no data sources
     mock_db_retrieve.return_value = {
@@ -59,8 +59,8 @@ def test_fetch_paginates_blocks(mocker):
     Test that fetch() correctly loops and flattens paginated block cursors.
     Why: If has_more loop breaks, we lose page content silently.
     """
-    mock_retrieve = mocker.patch("weekforge.tools.notion._client.pages.retrieve")
-    mock_blocks = mocker.patch("weekforge.tools.notion._client.blocks.children.list")
+    mock_retrieve = mocker.patch("weekforge.tools.notion_api_gateway._client.pages.retrieve")
+    mock_blocks = mocker.patch("weekforge.tools.notion_api_gateway._client.blocks.children.list")
     
     mock_retrieve.return_value = {
         "id": "page_123",

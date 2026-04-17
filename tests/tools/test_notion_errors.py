@@ -2,7 +2,7 @@ import httpx
 import pytest
 from notion_client.errors import APIResponseError
 
-from weekforge.tools.notion import (
+from weekforge.tools.notion_api_gateway import (
     NotionAPIError,
     NotionAuthFailedError,
     NotionNotFoundError,

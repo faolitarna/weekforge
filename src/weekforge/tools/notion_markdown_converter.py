@@ -1,7 +1,7 @@
 """Narrow markdown-to-Notion-blocks converter — only what session drafts need.
 
 Supports: h1/h2/h3 headings, checked/unchecked to-do items, bullets, paragraphs.
-No inline rich text. Unrecognised lines silently become paragraphs.
+No inline rich text. Unrecognised lines silently become paragraphs — no warning or log entry; callers cannot detect mistranslation.
 """
 from typing import Any
 
@@ -16,7 +16,7 @@ def convert_markdown_to_blocks(content: str) -> list[dict[str, Any]]:
     for line in lines:
         line_stripped = line.strip()
         if not line_stripped:
-            continue
+            continue  # blank lines are dropped entirely; visual spacing in source is lost in Notion output
 
         if line_stripped.startswith('# '):
             blocks.append({

@@ -23,7 +23,7 @@ from tenacity import (
 )
 
 from weekforge.config.env import settings
-from weekforge.tools.notion_markdown import convert_markdown_to_blocks
+from weekforge.tools.notion_markdown_converter import convert_markdown_to_blocks
 
 logger = logging.getLogger(__name__)
 
