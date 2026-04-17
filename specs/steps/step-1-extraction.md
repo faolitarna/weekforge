@@ -14,8 +14,8 @@ Step 0d complete (all infrastructure validated end-to-end).
 |------|---------|
 | `src/weekforge/workflows/extraction.py` | Extraction workflow (Lifecycle B) |
 | `src/weekforge/tools/extraction.py` | Feature-specific tool functions (query sessions, parse blocks) |
-| `src/weekforge/agents/agents.py` | Add `summarize_agent` definition |
-| `src/weekforge/models/state.py` | Extend with extraction-specific state model |
+| `src/weekforge/agents/ (test_agent.py, openai_model_factory.py, agent_run_with_metadata.py)` | Add `summarize_agent` definition |
+| `src/weekforge/pydantic_models/workflow_state.py` | Extend with extraction-specific state model |
 | Updates to `cli.py` | Wire `weekforge summarize` command |
 
 ## Specification

@@ -20,7 +20,7 @@ None. This is the first step.
 | `src/weekforge/checkpoint.py` | SQLite checkpoint store for workflow persistence |
 | `src/weekforge/hitl.py` | HITL presentation helpers (Rich panels + input) |
 | `src/weekforge/workflows/echo.py` | Minimal echo workflow with HITL |
-| `src/weekforge/models/state.py` | Base state schema (just `message: str` for now) |
+| `src/weekforge/pydantic_models/workflow_state.py` | Base state schema (just `message: str` for now) |
 
 ## Specification
 

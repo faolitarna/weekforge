@@ -12,7 +12,7 @@ Step 0a complete (project structure, checkpoint store, HITL helpers, CLI shell).
 
 | File | Purpose |
 |------|---------|
-| `src/weekforge/tools/notion.py` | Generic Notion tool layer (query, fetch, create, update) |
+| `src/weekforge/tools/notion_api_gateway.py` | Generic Notion tool layer (query, fetch, create, update) |
 | `src/weekforge/config/env.py` | Environment loading + startup validation |
 | `src/weekforge/workflows/notion_test.py` | Test workflow: query Notion -> HITL verify -> write back |
 

@@ -26,25 +26,30 @@ Agent and workflow code references task classes (`fast`, `reasoning`), never spe
 
 ### Model Configuration Structure
 
-```yaml
-models:
-  fast:
-    provider: openai
-    model: gpt-5.4-nano
-    reasoning: medium
-    temperature: 0.1
-  reasoning:
-    provider: openai
-    model: gpt-5.4
-    reasoning: medium
-    temperature: 0.7
+Model profiles are a Python dict (`src/weekforge/config/llm_profiles.py`). `.env` names which profile each task class uses (`FAST_PROFILE`, `REASONING_PROFILE`); defaults in the Pydantic Settings class mean the `.env` override is optional.
+
+```python
+@dataclass(frozen=True)
+class LLMProfile:
+    provider: str
+    model: str
+    temperature: float | None = None
+    reasoning_effort: Literal["low", "medium", "high"] | None = None
+
+
+LLM_PROFILES: dict[str, LLMProfile] = {
+    "gpt-5.4-nano": LLMProfile(provider="openai", model="gpt-5.4-nano", temperature=0.1),
+    "gpt-5.4":      LLMProfile(provider="openai", model="gpt-5.4", reasoning_effort="medium"),
+}
 ```
 
-Task classes resolve to Pydantic AI model strings (e.g., `"openai:gpt-5.4"`). Agents are instantiated with `Agent(model=get_model("reasoning"), ...)`.
+Profile keys are OpenAI model IDs — no separate naming layer until we need multiple tunings of the same model. `temperature` and `reasoning_effort` are mutually exclusive per model family (reasoning models like `gpt-5.4` ignore `temperature`; non-reasoning models don't take `reasoning_effort`).
+
+Task classes resolve to a `LLMProfile` via `resolve_llm_profile("reasoning")`. Agents are instantiated with `Agent(model=f"{spec.provider}:{spec.model}", model_settings=...)`, wiring only the non-`None` fields into `model_settings` (see [step-0c](../steps/step-0c-llm-integration.md) for the full pattern).
 
 ### Response Metadata
 
-Every LLM call returns metadata via Pydantic AI's `result.cost()`: `request_tokens`, `response_tokens`, `total_tokens`. Latency is captured via a timing wrapper. A `RunCost` accumulator tracks cost from every LLM call during a workflow run — the CLI displays the total at completion.
+Every LLM call returns metadata via Pydantic AI's `result.usage()`: `input_tokens`, `output_tokens`. Latency is captured via a timing wrapper. A `RunCost` accumulator tracks cost from every LLM call during a workflow run — the CLI displays the total at completion.
 
 ## Generic Notion Tool Layer
 

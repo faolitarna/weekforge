@@ -12,7 +12,7 @@ Step 0b complete (Notion tool layer, env loading).
 
 Step-0c is implemented in four parts, each independently verifiable:
 
-1. **Part 1 — Model Config Layer** (YAML profiles + `.env` selection + `get_model_spec`)
+1. **Part 1 — Model Config Layer** (Python profile registry + `.env` selection + `resolve_llm_profile`)
 2. **Part 2 — Agent + Cost Infrastructure** (`test_agent`, `CallMetadata`, `RunCost`)
 3. **Part 3 — Test Workflow + CLI** (end-to-end `weekforge llm-test`)
 4. **Part 4 — Euro Cost Estimation** (`pricing.py`, per-model rates, EUR in summary)
@@ -21,12 +21,12 @@ Step-0c is implemented in four parts, each independently verifiable:
 
 | File | Part | Purpose |
 |------|------|---------|
-| `config/models.yaml` | 1 | Model profile registry (project root) |
+| `src/weekforge/config/llm_profiles.py` | 1 | `LLMProfile` dataclass + `LLM_PROFILES` registry |
 | `src/weekforge/config/env.py` | 1 | Extended Settings with API key + profile selection |
-| `src/weekforge/config/models.py` | 1 | Profile loader, `get_model_spec(task_class)` |
+| `src/weekforge/config/llm_profiles.py` | 1 | `resolve_llm_profile(task_class)` resolver |
 | `src/weekforge/agents/__init__.py` | 2 | Package marker |
-| `src/weekforge/agents/agents.py` | 2 | Agent instances for each task type |
-| `src/weekforge/models/cost.py` | 2, 4 | `CallMetadata`, `RunCost` (extended with EUR in P4) |
+| `src/weekforge/agents/ (test_agent.py, openai_model_factory.py, agent_run_with_metadata.py)` | 2 | Agent instances + `run_with_metadata` wrapper |
+| `src/weekforge/pydantic_models/llm_call_cost.py` | 2, 4 | `CallMetadata`, `RunCost` (extended with EUR in P4) |
 | `src/weekforge/workflows/llm_test.py` | 3 | Test workflow: Notion → agent → HITL |
 | `src/weekforge/cli.py` | 3 | Extended with `llm-test` command |
 | `src/weekforge/models/pricing.py` | 4 | Per-model USD rates, `estimate_cost_eur` |
@@ -37,88 +37,143 @@ Step-0c is implemented in four parts, each independently verifiable:
 
 Weekforge uses Pydantic AI for LLM integration. Model configuration is layered:
 
-- **`config/models.yaml`** — registry of model *profiles*. Each profile bundles provider + model + per-model knobs (temperature, plus any future provider-specific params). Edit this to add a profile or tune params.
-- **`.env`** — selects which profile each task class uses. Edit this to swap models without touching YAML.
+- **`src/weekforge/config/llm_profiles.py`** — registry of model *profiles* as a Python dict. Each profile bundles provider + model + optional per-model knobs (`temperature`, `reasoning_effort`). Edit this to add a profile or tune params. A Python module (instead of YAML) gives us type-checking on every field, no extra dependencies, no package-data build config, and no path resolution — the "config" is still physically separated from the resolver logic.
+- **`.env`** — selects which profile each task class uses. Edit this to swap models without touching the profile registry.
 
 **Task classes** (the interface agent code uses — never references model names directly):
 
-| Task Class | Purpose | Default Profile | Default Model |
-|-----------|---------|-----------------|---------------|
-| `fast` | Routing, classification, lightweight decisions | `gpt5-nano-fast` | `gpt-5.4-nano` |
-| `reasoning` | Planning, generation, synthesis | `gpt5-reasoning` | `gpt-5.4` |
+| Task Class | Purpose | Default Profile / Model |
+|-----------|---------|-------------------------|
+| `fast` | Routing, classification, lightweight decisions | `gpt-5.4-nano` |
+| `reasoning` | Planning, generation, synthesis | `gpt-5.4` |
 
-**Profile registry (`config/models.yaml`):**
+Profile keys are the OpenAI model IDs — no separate naming layer until we actually need multiple tunings of the same model (then suffix them, e.g. `gpt-5.4-creative`).
 
-```yaml
-profiles:
-  gpt5-nano-fast:
-    provider: openai
-    model: gpt-5.4-nano
-    temperature: 0.1
-  gpt5-reasoning:
-    provider: openai
-    model: gpt-5.4
-    temperature: 0.7
-  # Future: anthropic profiles, alternate temps, reasoning-mini, etc.
+**Profile registry (`src/weekforge/config/llm_profiles.py`):**
+
+```python
+from dataclasses import dataclass
+from typing import Literal
+
+
+@dataclass(frozen=True)
+class LLMProfile:
+    provider: str
+    model: str
+    temperature: float | None = None
+    reasoning_effort: Literal["low", "medium", "high"] | None = None
+
+
+LLM_PROFILES: dict[str, LLMProfile] = {
+    "gpt-5.4-nano": LLMProfile(
+        provider="openai",
+        model="gpt-5.4-nano",
+        temperature=0.1,
+    ),
+    "gpt-5.4": LLMProfile(
+        provider="openai",
+        model="gpt-5.4",
+        reasoning_effort="medium",
+    ),
+}
 ```
+
+Note: `gpt-5.4` is a reasoning model — OpenAI ignores `temperature` for it. The relevant knob is `reasoning_effort` (maps to `openai_reasoning_effort` in Pydantic AI). Keep `temperature` for non-reasoning models; use `reasoning_effort` for reasoning models; leave the other field `None`.
+
+**Endpoint selection is coupled to this mutex.** Reasoning profiles (`reasoning_effort` set) must use OpenAI's **Responses API** (`OpenAIResponsesModel` → `/v1/responses`) — Chat Completions rejects function tools + `reasoning_effort`, and Pydantic AI uses function tools for structured output (`output_type`). Non-reasoning profiles use `OpenAIChatModel` → `/v1/chat/completions`. `agents/ (test_agent.py, openai_model_factory.py, agent_run_with_metadata.py)` branches on `spec.reasoning_effort is not None` to pick the right model class.
 
 **Profile selection (`.env`):**
 
 ```env
 OPENAI_API_KEY=your_openai_api_key_here
-FAST_PROFILE=gpt5-nano-fast
-REASONING_PROFILE=gpt5-reasoning
+FAST_PROFILE=gpt-5.4-nano
+REASONING_PROFILE=gpt-5.4
 ```
 
 `.env` overrides are optional — defaults live in the Pydantic Settings class.
 
-**Resolution (`config/models.py`):**
+**Resolution (`src/weekforge/config/llm_profiles.py`):**
 
 ```python
-@dataclass(frozen=True)
-class ModelSpec:
-    provider: str
-    model: str
-    temperature: float
+from typing import Literal
 
-def get_model_spec(task_class: Literal["fast", "reasoning"]) -> ModelSpec:
-    """Resolve task class -> profile name (from settings) -> ModelSpec (from YAML)."""
+from weekforge.config.env import settings
+from weekforge.config.llm_profiles import LLM_PROFILES, LLMProfile
+
+
+def resolve_llm_profile(task_class: Literal["fast", "reasoning"]) -> LLMProfile:
+    """Resolve task class -> profile name (from settings) -> LLMProfile."""
     profile_name = getattr(settings, f"{task_class}_profile")
-    return load_profiles()[profile_name]
+    if profile_name not in LLM_PROFILES:
+        raise KeyError(
+            f"Model profile {profile_name!r} not found. "
+            f"Available: {sorted(LLM_PROFILES)}"
+        )
+    return LLM_PROFILES[profile_name]
 ```
 
-Swapping a model = change `.env`. Tweaking a profile's params = change YAML. Agent code references task classes only.
+Swapping a model = change `.env`. Tweaking a profile's params = edit `profiles.py`. Agent code references task classes only.
 
 ### Agent Definitions
 
-Each domain task gets its own Pydantic AI `Agent` instance with a specific system prompt and `result_type`. The agent is built from a `ModelSpec` — provider, model, and temperature wired in at construction:
+Each domain task gets its own Pydantic AI `Agent` instance with a specific system prompt and `output_type`. The agent is built from a `LLMProfile` — provider, model, and whichever params the spec declares are wired in at construction. Because `temperature` and `reasoning_effort` are mutually-exclusive per model family, include only the non-`None` fields:
 
 ```python
+from pydantic import BaseModel
 from pydantic_ai import Agent
-from weekforge.config.models import get_model_spec
+from pydantic_ai.models.openai import (
+    OpenAIChatModel, OpenAIResponsesModel, OpenAIChatModelSettings, OpenAIResponsesModelSettings,
+)
+from pydantic_ai.providers.openai import OpenAIProvider
+from weekforge.config.env import settings
+from weekforge.config.llm_profiles import resolve_llm_profile
 
-spec = get_model_spec("reasoning")
+
+class TestResult(BaseModel):
+    summary: str
+
+
+spec = resolve_llm_profile("reasoning")
+provider = OpenAIProvider(api_key=settings.openai_api_key)
+
+if spec.reasoning_effort is not None:
+    model = OpenAIResponsesModel(spec.model, provider=provider)
+    model_settings: OpenAIResponsesModelSettings = {"openai_reasoning_effort": spec.reasoning_effort}
+else:
+    model = OpenAIChatModel(spec.model, provider=provider)
+    chat_settings: OpenAIChatModelSettings = {}
+    if spec.temperature is not None:
+        chat_settings["temperature"] = spec.temperature
+    model_settings = chat_settings
+
 test_agent = Agent(
-    model=f"{spec.provider}:{spec.model}",
-    model_settings={"temperature": spec.temperature},
+    model=model,
+    model_settings=model_settings,
     system_prompt="You are a test processor...",
-    result_type=ProcessedResult,
+    output_type=TestResult,
 )
 ```
 
-Agents are defined in `agents/agents.py`. Workflows import and call them via `agent.run_sync()` (synchronous — consistent with the existing plain-`def` workflow pattern).
+`TestResult` is the minimum structured-output shape for Part 2 — enough to validate the config-resolution + Pydantic AI wiring. Richer result types land with the domain workflows that need them.
+
+Agents are defined in `agents/ (test_agent.py, openai_model_factory.py, agent_run_with_metadata.py)`. Workflows call them via `run_with_metadata(agent, prompt)` (see below) — a thin `run_sync` wrapper that captures tokens + latency in one step.
 
 ### Response Metadata
 
-Every LLM call captures metadata from Pydantic AI's `result.usage()` (Pydantic AI ≥ 0.0.14 API):
+Every LLM call captures metadata from Pydantic AI's `result.usage()` (Pydantic AI ≥ 1.0 API — field names are `input_tokens` / `output_tokens`):
 
 | Field | Source | Description |
 |-------|--------|-------------|
-| `request_tokens` | `result.usage().request_tokens` | Prompt token count |
-| `response_tokens` | `result.usage().response_tokens` | Completion token count |
-| `latency_ms` | `time.perf_counter()` wrapper | Wall-clock time for the call |
-| `model_used` | `get_model_spec(...).model` | Actual model identifier |
+| `input_tokens` | `result.usage().input_tokens` | Prompt token count |
+| `output_tokens` | `result.usage().output_tokens` | Completion token count |
+| `latency_ms` | `run_with_metadata()` wrapper in `agents/ (test_agent.py, openai_model_factory.py, agent_run_with_metadata.py)` | Wall-clock time for the call |
+| `model_used` | `agent.model.model_name` | Actual model identifier |
 | `cost_eur` | `estimate_cost_eur(model, in, out)` | Euro cost (added in Part 4; `0.0` until then) |
+
+```python
+def run_with_metadata(agent: Agent, prompt: str) -> tuple[AgentRunResult, CallMetadata]:
+    """Wraps agent.run_sync() with perf_counter timing; returns typed result + metadata."""
+```
 
 ### Run-Level Cost Accumulation
 
@@ -134,7 +189,7 @@ class RunCost:
     total_cost_eur: float = 0.0  # populated once Part 4 lands
 
     def add(self, meta: CallMetadata) -> None: ...
-    def summary(self) -> str: ...  # Rich-renderable
+    def summary(self) -> str: ...  # Rich-markup line; callers wrap in their own Panel
 ```
 
 ### Test Workflow
@@ -178,8 +233,8 @@ def estimate_cost_eur(model: str, input_tokens: int, output_tokens: int) -> floa
 OPENAI_API_KEY=your_openai_api_key_here
 
 # Optional: override default profile selection
-FAST_PROFILE=gpt5-nano-fast
-REASONING_PROFILE=gpt5-reasoning
+FAST_PROFILE=gpt-5.4-nano
+REASONING_PROFILE=gpt-5.4
 ```
 
 Pydantic AI reads `OPENAI_API_KEY` from the environment automatically for OpenAI models. Missing `OPENAI_API_KEY` fails fast at import (same pattern as `NOTION_TOKEN`).
@@ -187,18 +242,19 @@ Pydantic AI reads `OPENAI_API_KEY` from the environment automatically for OpenAI
 ## Acceptance Criteria
 
 ### Part 1 — Model Config Layer
-- [ ] `config/models.yaml` defines `gpt5-nano-fast` and `gpt5-reasoning` profiles
-- [ ] Settings extended: `openai_api_key`, `fast_profile`, `reasoning_profile`
-- [ ] `get_model_spec("fast")` returns a `ModelSpec` for the configured profile
-- [ ] Missing `OPENAI_API_KEY` fails at import with a clear message
-- [ ] Invalid profile name raises a clear error
-- [ ] `pyyaml` added to `pyproject.toml`
+- [x] `src/weekforge/config/llm_profiles.py` defines `LLMProfile` + `LLM_PROFILES` dict with `gpt-5.4-nano` and `gpt-5.4` entries
+- [x] `LLMProfile` carries optional `temperature` and `reasoning_effort` (mutually exclusive per model family)
+- [x] Settings extended: `openai_api_key`, `fast_profile`, `reasoning_profile`
+- [x] `resolve_llm_profile("fast")` returns a `LLMProfile` for the configured profile
+- [x] Missing `OPENAI_API_KEY` fails at import with a clear message
+- [x] Invalid profile name raises a `KeyError` listing available profiles
 
 ### Part 2 — Agent + Cost Infrastructure
-- [ ] `test_agent` constructs from `get_model_spec("reasoning")` (provider + model + temperature wired in)
-- [ ] `CallMetadata` dataclass defined
-- [ ] `RunCost.add()` accumulates correctly (unit-testable with fake metadata)
-- [ ] `RunCost.summary()` renders tokens + latency (no euro yet)
+- [x] `test_agent` constructs from `resolve_llm_profile("reasoning")` with only the non-`None` model-settings fields wired in (temperature OR reasoning_effort, not both)
+- [x] `CallMetadata` dataclass defined (`input_tokens` / `output_tokens` matching Pydantic AI `RunUsage`)
+- [x] `RunCost.add()` accumulates correctly (unit-testable with fake metadata)
+- [x] `RunCost.summary()` renders tokens + latency as a Rich-markup string (no euro yet)
+- [x] `run_with_metadata(agent, prompt)` wraps `agent.run_sync()` and produces `CallMetadata` via `result.usage()` + `perf_counter` timing
 
 ### Part 3 — Test Workflow + CLI
 - [ ] Test workflow queries Notion, calls `test_agent.run_sync()`, returns structured output
