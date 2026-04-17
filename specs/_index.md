@@ -23,6 +23,7 @@ Background architecture — read once for context, not required during implement
 - [Patterns](./reference/patterns.md) — Agentic design patterns applied to Weekforge
 - [State Schema](./reference/state-schema.md) — Three-layer workflow state
 - [Failure Modes](./reference/failure-modes.md) — Error handling catalog
+- [Prompt Style](./reference/prompt-style.md) — Caveman-lite directive, global `CAVEMAN_MODE` toggle
 
 ## Other
 

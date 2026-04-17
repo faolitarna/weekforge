@@ -158,6 +158,8 @@ test_agent = Agent(
 
 Agents are defined in `agents/ (test_agent.py, openai_model_factory.py, agent_run_with_metadata.py)`. Workflows call them via `run_with_metadata(agent, prompt)` (see below) — a thin `run_sync` wrapper that captures tokens + latency in one step.
 
+**Prompt-style composition.** Every agent's `system_prompt` is routed through the composer defined in [reference/prompt-style.md](../reference/prompt-style.md). When `CAVEMAN_MODE` is disabled (default), the base prompt is used verbatim; when enabled, the caveman-lite directive is appended. See the reference doc for the exact directive text and design rationale.
+
 ### Response Metadata
 
 Every LLM call captures metadata from Pydantic AI's `result.usage()` (Pydantic AI ≥ 1.0 API — field names are `input_tokens` / `output_tokens`):
@@ -251,19 +253,20 @@ Pydantic AI reads `OPENAI_API_KEY` from the environment automatically for OpenAI
 
 ### Part 2 — Agent + Cost Infrastructure
 - [x] `test_agent` constructs from `resolve_llm_profile("reasoning")` with only the non-`None` model-settings fields wired in (temperature OR reasoning_effort, not both)
+- [ ] `test_agent`'s `system_prompt` is composed via the prompt-style composer described in [reference/prompt-style.md](../reference/prompt-style.md) (baseline: `CAVEMAN_MODE=false` leaves the prompt unchanged)
 - [x] `CallMetadata` dataclass defined (`input_tokens` / `output_tokens` matching Pydantic AI `RunUsage`)
 - [x] `RunCost.add()` accumulates correctly (unit-testable with fake metadata)
 - [x] `RunCost.summary()` renders tokens + latency as a Rich-markup string (no euro yet)
 - [x] `run_with_metadata(agent, prompt)` wraps `agent.run_sync()` and produces `CallMetadata` via `result.usage()` + `perf_counter` timing
 
 ### Part 3 — Test Workflow + CLI
-- [ ] Test workflow queries Notion, calls `test_agent.run_sync()`, returns structured output
-- [ ] Response metadata captured via `result.usage()` + timing wrapper
-- [ ] `weekforge llm-test` runs end-to-end against the real OpenAI API
-- [ ] HITL panel shows agent output + run cost
-- [ ] Checkpoint save/resume works (same pattern as step-0a/0b)
-- [ ] Changing a profile in `.env` switches the actual model used
-- [ ] `uv run ruff check .` and `uv run mypy src/` pass
+- [x] Test workflow queries Notion, calls `test_agent.run_sync()`, returns structured output
+- [x] Response metadata captured via `result.usage()` + timing wrapper
+- [x] `weekforge llm-test` runs end-to-end against the real OpenAI API
+- [x] HITL panel shows agent output + run cost
+- [x] Checkpoint save/resume works (same pattern as step-0a/0b)
+- [x] Changing a profile in `.env` switches the actual model used
+- [x] `uv run ruff check .` and `uv run mypy src/` pass
 
 ### Part 4 — Euro Cost Estimation
 - [ ] `PRICING` dict seeded with `gpt-5.4` and `gpt-5.4-nano` rates
