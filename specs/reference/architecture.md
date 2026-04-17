@@ -2,17 +2,17 @@
 
 ## System Overview & Legacy Context
 
-The Weekforge project migrates legacy declarative text-based recipes (used manually with Claude Code) into a structured workflow application using **Pydantic AI** for LLM integration and **plain Python** for orchestration. The migration introduces Agentic Patterns, optimizes token usage via Python tooling, constructs a rich local CLI environment, and employs model-agnostic routing to balance cost and cognitive power.
+Weekforge migrates legacy declarative text-based recipes (used manually with Claude Code) into structured workflow app using **Pydantic AI** for LLM integration and **plain Python** for orchestration. Migration introduces Agentic Patterns, optimizes token usage via Python tooling, builds rich local CLI, employs model-agnostic routing to balance cost and cognitive power.
 
-**Agentic Complexity Level: 2 — Strategic Problem-Solver** (per Agentic Design Patterns Guide). Weekforge uses Context Engineering as a systematic discipline — strategically curating the model's context through PLAN_STATE, 3-week feedback windows, and summary-first loading. It implements automated feedback loops (Evaluator-Optimizer) for self-improvement of output quality. It does **not** reach Level 3 (Collaborative Multi-Agent) — there is a single reasoning agent. This is intentional: multi-agent coordination adds complexity without benefit for a single-user, single-domain workflow.
+**Agentic Complexity Level: 2 — Strategic Problem-Solver** (per Agentic Design Patterns Guide). Weekforge uses Context Engineering as systematic discipline — curates model context via PLAN_STATE, 3-week feedback windows, summary-first loading. Implements automated feedback loops (Evaluator-Optimizer) for output quality self-improvement. Does **not** reach Level 3 (Collaborative Multi-Agent) — single reasoning agent. Intentional: multi-agent coordination adds complexity without benefit for single-user, single-domain workflow.
 
-**Framework choice (DEC-004):** Every workflow is a sequential pipeline with at most one loop. Plain Python `async def` functions with `for`/`while`/`if` handle orchestration. Pydantic AI handles LLM calls with structured output validation and model-agnostic bindings. A lightweight custom checkpoint store (~60 lines) handles CLI session persistence.
+**Framework choice (DEC-004):** Every workflow = sequential pipeline with at most one loop. Plain Python `async def` functions with `for`/`while`/`if` handle orchestration. Pydantic AI handles LLM calls with structured output validation and model-agnostic bindings. Lightweight custom checkpoint store (~60 lines) handles CLI session persistence.
 
 ## Intelligence Tiering & Task Abstraction
 
-- **Tier 0 (Pure Python, Zero LLM):** All database querying, data formatting, structural validation, and deterministic logic. Tool nodes, the Deterministic Evaluator, and state management live here. Every operation that *can* be Python *must* be Python.
-- **Tier 1 (Cheap/Fast Models):** Routing, classification, and lightweight decisions where deterministic rules aren't sufficient.
-- **Tier 2 (Heavy Cognitive Models):** `plan_week`, `draft_session`, `summarize_week` — macro-planning, session generation, and feedback synthesis.
+- **Tier 0 (Pure Python, Zero LLM):** All DB querying, data formatting, structural validation, deterministic logic. Tool nodes, Deterministic Evaluator, state management live here. Every operation that *can* be Python *must* be Python.
+- **Tier 1 (Cheap/Fast Models):** Routing, classification, lightweight decisions where deterministic rules insufficient.
+- **Tier 2 (Heavy Cognitive Models):** `plan_week`, `draft_session`, `summarize_week` — macro-planning, session generation, feedback synthesis.
 
 ### Task Classes (Configuration Interface)
 
@@ -22,11 +22,11 @@ The Weekforge project migrates legacy declarative text-based recipes (used manua
 | `fast` | Tier 1 | Routing, classification | `gpt-5.4-nano` |
 | `reasoning` | Tier 2 | Planning, generation, synthesis | `gpt-5.4` |
 
-Agent and workflow code references task classes (`fast`, `reasoning`), never specific model names. Swapping a model means changing one config entry.
+Agent and workflow code references task classes (`fast`, `reasoning`), never specific model names. Swapping model = changing one config entry.
 
 ### Model Configuration Structure
 
-Model profiles are a Python dict (`src/weekforge/config/llm_profiles.py`). `.env` names which profile each task class uses (`FAST_PROFILE`, `REASONING_PROFILE`); defaults in the Pydantic Settings class mean the `.env` override is optional.
+Model profiles = Python dict (`src/weekforge/config/llm_profiles.py`). `.env` names which profile each task class uses (`FAST_PROFILE`, `REASONING_PROFILE`); defaults in Pydantic Settings class make `.env` override optional.
 
 ```python
 @dataclass(frozen=True)
@@ -43,26 +43,26 @@ LLM_PROFILES: dict[str, LLMProfile] = {
 }
 ```
 
-Profile keys are OpenAI model IDs — no separate naming layer until we need multiple tunings of the same model. `temperature` and `reasoning_effort` are mutually exclusive per model family (reasoning models like `gpt-5.4` ignore `temperature`; non-reasoning models don't take `reasoning_effort`).
+Profile keys are OpenAI model IDs — no separate naming layer until multiple tunings of same model needed. `temperature` and `reasoning_effort` mutually exclusive per model family (reasoning models like `gpt-5.4` ignore `temperature`; non-reasoning models don't take `reasoning_effort`).
 
-Task classes resolve to a `LLMProfile` via `resolve_llm_profile("reasoning")`. Agents are instantiated with `Agent(model=f"{spec.provider}:{spec.model}", model_settings=...)`, wiring only the non-`None` fields into `model_settings` (see [step-0c](../steps/step-0c-llm-integration.md) for the full pattern).
+Task classes resolve to `LLMProfile` via `resolve_llm_profile("reasoning")`. Agents instantiated with `Agent(model=f"{spec.provider}:{spec.model}", model_settings=...)`, wiring only non-`None` fields into `model_settings` (see [step-0c](../steps/step-0c-llm-integration.md) for full pattern).
 
 ### Response Metadata
 
-Every LLM call returns metadata via Pydantic AI's `result.usage()`: `input_tokens`, `output_tokens`. Latency is captured via a timing wrapper. A `RunCost` accumulator tracks cost from every LLM call during a workflow run — the CLI displays the total at completion.
+Every LLM call returns metadata via Pydantic AI's `result.usage()`: `input_tokens`, `output_tokens`. Latency captured via timing wrapper. `RunCost` accumulator tracks cost from every LLM call during workflow run — CLI displays total at completion.
 
 ## Generic Notion Tool Layer
 
-All Notion interactions are encapsulated in a reusable Tier-0 tool layer. The LLM never touches Notion directly; it receives structured data from tools and returns structured outputs that tools write.
+All Notion interactions encapsulated in reusable Tier-0 tool layer. LLM never touches Notion directly; receives structured data from tools, returns structured outputs that tools write.
 
 **Generic operations:** Query, Fetch, Create, Update.
 
 **Design principles:**
-- Tool inputs and outputs are typed data structures, not free text
-- Notion API specifics (pagination, rate limiting, property type mapping) are hidden inside the tool layer
-- Specific tool nodes (e.g., "fetch templates by week prefix") are defined in step specs, composing these primitives
+- Tool inputs/outputs are typed data structures, not free text
+- Notion API specifics (pagination, rate limiting, property type mapping) hidden inside tool layer
+- Specific tool nodes (e.g., "fetch templates by week prefix") defined in step specs, composing these primitives
 
-> Full interface contracts for the tool layer are specified in [step-0b](../steps/step-0b-notion-tools.md).
+> Full interface contracts for tool layer specified in [step-0b](../steps/step-0b-notion-tools.md).
 
 ## CLI Architecture
 
@@ -76,25 +76,25 @@ All Notion interactions are encapsulated in a reusable Tier-0 tool layer. The LL
 | Command | Behavior |
 |---------|----------|
 | `weekforge` | Show available commands + active checkpoint status |
-| `weekforge plan` | Start or resume the planning lifecycle (Lifecycle A) |
-| `weekforge summarize` | Start or resume the extraction lifecycle (Lifecycle B) |
-| `weekforge continue` | Resume from the last checkpoint (any lifecycle) |
+| `weekforge plan` | Start or resume planning lifecycle (Lifecycle A) |
+| `weekforge summarize` | Start or resume extraction lifecycle (Lifecycle B) |
+| `weekforge continue` | Resume from last checkpoint (any lifecycle) |
 
 ### AuDHD-Informed Design Principles
 
-Grounded in the user's cognitive profile (`references/szymi-blueprint.md`):
+Grounded in user's cognitive profile (`references/szymi-blueprint.md`):
 
-- **Zero-decision entry.** Single command with no arguments shows what's available.
+- **Zero-decision entry.** Single command, no arguments, shows what's available.
 - **Progressive disclosure.** Summary first, depth on request.
-- **Scannable output.** Fixed, predictable section headers. No walls of prose.
+- **Scannable output.** Fixed, predictable section headers. No prose walls.
 - **Clear decision points.** Every HITL pause: (1) what you're looking at, (2) options, (3) recommendation.
 - **Flow-compatible momentum.** Approve -> auto-continue -> next draft preserves flow state.
 - **Dopamine milestones.** Progress visualization (`3/8 ████░░░░`), completion celebrations.
-- **Refinement over generation.** Present a draft, ask "what would you change?" — never "what do you want?"
+- **Refinement over generation.** Present draft, ask "what would you change?" — never "what do you want?"
 
 ### HITL Presentation Pattern
 
-Every interrupt renders a Rich panel with: **Context** (what you're looking at), **Options** (what you can do), **Recommendation** (suggested action).
+Every interrupt renders Rich panel with: **Context** (what you're looking at), **Options** (what you can do), **Recommendation** (suggested action).
 
 ### Output Formatting
 
@@ -111,7 +111,7 @@ Every interrupt renders a Rich panel with: **Context** (what you're looking at),
 
 - **`.env`** — Secret values. In `.gitignore`.
 - **`.env.template`** — Committed. Variable names with placeholders and comments.
-- On startup, validate all required env vars are present. Fail immediately with clear error if missing.
+- On startup, validate all required env vars present. Fail immediately with clear error if missing.
 
 ## Project Tooling Standards
 
@@ -154,7 +154,7 @@ weekforge/
 ### Development Workflow
 
 1. `uv sync` — Install/update dependencies
-2. `uv run weekforge` — Run the application
+2. `uv run weekforge` — Run application
 3. `uv run ruff check .` — Lint
 4. `uv run ruff format .` — Format
 5. `uv run mypy src/` — Type check
@@ -162,4 +162,4 @@ weekforge/
 
 ## User Configuration
 
-User profiles and guardrails are stored in Notion. A `ConfigLoader` node fetches this data at runtime.
+User profiles and guardrails stored in Notion. `ConfigLoader` node fetches at runtime.
