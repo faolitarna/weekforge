@@ -1,5 +1,14 @@
+from pydantic import BaseModel
+
 from weekforge.checkpoint import CheckpointStore
-from weekforge.models.workflow_state import State
+
+
+class _State(BaseModel):
+    """Minimal fixture — checkpoint store is state-schema-agnostic."""
+    message: str = ""
+
+
+State = _State
 
 
 def _mem_store() -> CheckpointStore:

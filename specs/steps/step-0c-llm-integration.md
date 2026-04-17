@@ -13,8 +13,8 @@ Step 0b complete (Notion tool layer, env loading).
 Step-0c is implemented in four parts, each independently verifiable:
 
 1. **Part 1 — Model Config Layer** (Python profile registry + `.env` selection + `resolve_llm_profile`)
-2. **Part 2 — Agent + Cost Infrastructure** (`test_agent`, `CallMetadata`, `RunCost`)
-3. **Part 3 — Test Workflow + CLI** (end-to-end `weekforge llm-test`)
+2. **Part 2 — Agent + Cost Infrastructure** (`e2e_agent`, `CallMetadata`, `RunCost`)
+3. **Part 3 — Test Workflow + CLI** (end-to-end `weekforge e2e`)
 4. **Part 4 — Euro Cost Estimation** (`pricing.py`, per-model rates, EUR in summary)
 
 ## What You're Building
@@ -80,7 +80,7 @@ LLM_PROFILES: dict[str, LLMProfile] = {
 
 Note: `gpt-5.4` is a reasoning model — OpenAI ignores `temperature` for it. The relevant knob is `reasoning_effort` (maps to `openai_reasoning_effort` in Pydantic AI). Keep `temperature` for non-reasoning models; use `reasoning_effort` for reasoning models; leave the other field `None`.
 
-**Endpoint selection is coupled to this mutex.** Reasoning profiles (`reasoning_effort` set) must use OpenAI's **Responses API** (`OpenAIResponsesModel` → `/v1/responses`) — Chat Completions rejects function tools + `reasoning_effort`, and Pydantic AI uses function tools for structured output (`output_type`). Non-reasoning profiles use `OpenAIChatModel` → `/v1/chat/completions`. `agents/ (test_agent.py, openai_model_factory.py, agent_run_with_metadata.py)` branches on `spec.reasoning_effort is not None` to pick the right model class.
+**Endpoint selection is coupled to this mutex.** Reasoning profiles (`reasoning_effort` set) must use OpenAI's **Responses API** (`OpenAIResponsesModel` → `/v1/responses`) — Chat Completions rejects function tools + `reasoning_effort`, and Pydantic AI uses function tools for structured output (`output_type`). Non-reasoning profiles use `OpenAIChatModel` → `/v1/chat/completions`. `agents/openai_model_factory.py` branches on `spec.reasoning_effort is not None` to pick the right model class.
 
 **Profile selection (`.env`):**
 
@@ -129,7 +129,7 @@ from weekforge.config.env import settings
 from weekforge.config.llm_profiles import resolve_llm_profile
 
 
-class TestResult(BaseModel):
+class ProcessorResult(BaseModel):
     summary: str
 
 
@@ -146,17 +146,17 @@ else:
         chat_settings["temperature"] = spec.temperature
     model_settings = chat_settings
 
-test_agent = Agent(
+e2e_agent = Agent(
     model=model,
     model_settings=model_settings,
     system_prompt="You are a test processor...",
-    output_type=TestResult,
+    output_type=ProcessorResult,
 )
 ```
 
-`TestResult` is the minimum structured-output shape for Part 2 — enough to validate the config-resolution + Pydantic AI wiring. Richer result types land with the domain workflows that need them.
+`ProcessorResult` is the minimum structured-output shape for Part 2 — enough to validate the config-resolution + Pydantic AI wiring. Richer result types land with the domain workflows that need them.
 
-Agents are defined in `agents/ (test_agent.py, openai_model_factory.py, agent_run_with_metadata.py)`. Workflows call them via `run_with_metadata(agent, prompt)` (see below) — a thin `run_sync` wrapper that captures tokens + latency in one step.
+Agents are defined in `agents/ (e2e_agent.py, openai_model_factory.py, agent_run_with_metadata.py, prompt_composer.py)`. Workflows call them via `run_with_metadata(agent, prompt)` (see below) — a thin `run_sync` wrapper that captures tokens + latency in one step.
 
 **Prompt-style composition.** Every agent's `system_prompt` is routed through the composer defined in [reference/prompt-style.md](../reference/prompt-style.md). When `CAVEMAN_MODE` is disabled (default), the base prompt is used verbatim; when enabled, the caveman-lite directive is appended. See the reference doc for the exact directive text and design rationale.
 
@@ -168,7 +168,7 @@ Every LLM call captures metadata from Pydantic AI's `result.usage()` (Pydantic A
 |-------|--------|-------------|
 | `input_tokens` | `result.usage().input_tokens` | Prompt token count |
 | `output_tokens` | `result.usage().output_tokens` | Completion token count |
-| `latency_ms` | `run_with_metadata()` wrapper in `agents/ (test_agent.py, openai_model_factory.py, agent_run_with_metadata.py)` | Wall-clock time for the call |
+| `latency_ms` | `run_with_metadata()` wrapper in `agents/agent_run_with_metadata.py` | Wall-clock time for the call |
 | `model_used` | `agent.model.model_name` | Actual model identifier |
 | `cost_eur` | `estimate_cost_eur(model, in, out)` | Euro cost (added in Part 4; `0.0` until then) |
 
@@ -261,17 +261,17 @@ Pydantic AI reads `OPENAI_API_KEY` from the environment automatically for OpenAI
 - [x] Invalid profile name raises a `KeyError` listing available profiles
 
 ### Part 2 — Agent + Cost Infrastructure
-- [x] `test_agent` constructs from `resolve_llm_profile("reasoning")` with only the non-`None` model-settings fields wired in (temperature OR reasoning_effort, not both)
-- [x] `test_agent`'s `system_prompt` is composed via the prompt-style composer described in [reference/prompt-style.md](../reference/prompt-style.md) (baseline: `CAVEMAN_MODE=false` leaves the prompt unchanged)
+- [x] `e2e_agent` constructs from `resolve_llm_profile("reasoning")` with only the non-`None` model-settings fields wired in (temperature OR reasoning_effort, not both)
+- [x] `e2e_agent`'s `system_prompt` is composed via the prompt-style composer described in [reference/prompt-style.md](../reference/prompt-style.md) (baseline: `CAVEMAN_MODE=false` leaves the prompt unchanged)
 - [x] `CallMetadata` dataclass defined (`input_tokens` / `output_tokens` matching Pydantic AI `RunUsage`)
 - [x] `RunCost.add()` accumulates correctly (unit-testable with fake metadata)
 - [x] `RunCost.summary()` renders tokens + latency as a Rich-markup string (no euro yet)
 - [x] `run_with_metadata(agent, prompt)` wraps `agent.run_sync()` and produces `CallMetadata` via `result.usage()` + `perf_counter` timing
 
 ### Part 3 — Test Workflow + CLI
-- [x] Test workflow queries Notion, calls `test_agent.run_sync()`, returns structured output
+- [x] E2E workflow queries Notion, calls `e2e_agent` via `run_with_metadata()`, returns structured output
 - [x] Response metadata captured via `result.usage()` + timing wrapper
-- [x] `weekforge llm-test` runs end-to-end against the real OpenAI API
+- [x] `weekforge e2e` runs end-to-end against the real OpenAI API
 - [x] HITL panel shows agent output + run cost
 - [x] Checkpoint save/resume works (same pattern as step-0a/0b)
 - [x] Changing a profile in `.env` switches the actual model used
