@@ -2,6 +2,9 @@
 .gemini/
 .antigravity/
 
+# Claude Code (local, untracked)
+CLAUDE.md
+
 # VSCode
 .vscode/
 *.code-workspace

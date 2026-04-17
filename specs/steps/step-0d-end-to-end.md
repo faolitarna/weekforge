@@ -13,7 +13,9 @@ Step 0c complete (model config, Pydantic AI agents, metadata capture).
 | File | Purpose |
 |------|---------|
 | `src/weekforge/workflows/e2e.py` | Full end-to-end validation workflow with feedback loop |
-| Updates to `cli.py` | Finalize command structure, remove test commands from 0a-0c |
+| `src/weekforge/agents/agent_run_with_metadata.py` | Extended: accept `message_history`, return updated messages |
+| `src/weekforge/hitl.py` | Extended: three-way prompt (approve / feedback / quit) |
+| Updates to `cli.py` | Finalize command structure, remove stepwise test commands (`echo`, `notion-test`, `llm-test`); add `e2e`, `plan`/`summarize` placeholders, `continue` |
 
 ## Specification
 
@@ -31,11 +33,12 @@ graph TD
 ```
 
 - Full loop: read -> process -> review -> write
-- HITL feedback loop: approve or provide feedback to re-process
+- HITL feedback loop: approve, provide feedback to re-process, or quit to pause
 - Feedback is passed back to the agent via `message_history` to maintain conversational context across iterations
+- Message history persists across HITL pauses via `ModelMessagesTypeAdapter.dump_python(..., mode="json")` / `validate_python` — close terminal mid-run and the next resume still sees prior turns
 - Checkpoint persistence across terminal sessions (close terminal mid-HITL, resume later)
 - Run cost accumulation and display at completion
-- Startup validation for all secrets and config
+- Startup validation for all secrets and config — Pydantic `ValidationError` is caught in the CLI callback and rendered as a Rich panel listing the missing variables
 
 ### Feedback Loop Pattern
 
@@ -61,11 +64,12 @@ The agent sees its previous output and the user's feedback, enabling iterative r
 | Command | Behavior |
 |---------|----------|
 | `weekforge` | Show available commands + active checkpoint status if a run exists |
+| `weekforge e2e` | **Transitional** — Phase-0 validation workflow. Subsumed by `summarize` in step 1 and removed then. |
 | `weekforge plan` | (Placeholder for step 2 — shows "not yet implemented") |
 | `weekforge summarize` | (Placeholder for step 1 — shows "not yet implemented") |
-| `weekforge continue` | Resume from the last checkpoint (any lifecycle) |
+| `weekforge continue --thread-id <tid>` | Resume from the last checkpoint (any lifecycle). Dispatches on the `workflow` field of the persisted record. |
 
-Remove any temporary test commands from steps 0a-0c. The CLI should now have the final command structure, with placeholder messages for features not yet built.
+Remove the stepwise test commands (`echo`, `notion-test`, `llm-test`) and their workflow modules + tests. They are superseded by the single `e2e` validation command. `e2e` itself is marked transitional and carries no long-term contract — it exists only until step 1 ships the real `summarize` lifecycle.
 
 ### HITL Presentation
 
@@ -85,15 +89,15 @@ On completion, show a Rich panel with:
 
 ## Acceptance Criteria
 
-- [ ] Full loop works: Notion query -> agent process -> HITL review -> Notion write
-- [ ] Feedback loop: providing feedback re-processes with agent (conversation context preserved), re-displays for review
-- [ ] Checkpoint persistence: close terminal mid-HITL, reopen, resume at same point
-- [ ] Run summary displayed at completion (cost, timing, calls)
-- [ ] Startup validation catches missing env vars with clear error
-- [ ] `weekforge` shows available commands and active checkpoint status
-- [ ] `weekforge continue` resumes any interrupted run
-- [ ] All test/temporary commands from 0a-0c removed
-- [ ] `uv run ruff check .` and `uv run mypy src/` pass
+- [x] Full loop works: Notion query -> agent process -> HITL review -> Notion write
+- [x] Feedback loop: providing feedback re-processes with agent (conversation context preserved), re-displays for review
+- [x] Checkpoint persistence: close terminal mid-HITL, reopen, resume at same point
+- [x] Run summary displayed at completion (cost, timing, calls)
+- [x] Startup validation catches missing env vars with clear error
+- [x] `weekforge` shows available commands and active checkpoint status
+- [x] `weekforge continue` resumes any interrupted run
+- [x] Stepwise test commands from 0a-0c removed (`echo`, `notion-test`, `llm-test`); single `e2e` command is the sole validation entry point (transitional, removed in step 1)
+- [x] `uv run ruff check .` and `uv run mypy src/` pass
 
 ## Reference
 

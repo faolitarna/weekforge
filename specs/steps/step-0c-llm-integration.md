@@ -25,10 +25,10 @@ Step-0c is implemented in four parts, each independently verifiable:
 | `src/weekforge/config/env.py` | 1 | Extended Settings with API key + profile selection |
 | `src/weekforge/config/llm_profiles.py` | 1 | `resolve_llm_profile(task_class)` resolver |
 | `src/weekforge/agents/__init__.py` | 2 | Package marker |
-| `src/weekforge/agents/ (test_agent.py, openai_model_factory.py, agent_run_with_metadata.py)` | 2 | Agent instances + `run_with_metadata` wrapper |
-| `src/weekforge/pydantic_models/llm_call_cost.py` | 2, 4 | `CallMetadata`, `RunCost` (extended with EUR in P4) |
-| `src/weekforge/workflows/llm_test.py` | 3 | Test workflow: Notion → agent → HITL |
-| `src/weekforge/cli.py` | 3 | Extended with `llm-test` command |
+| `src/weekforge/agents/ (e2e_agent.py, openai_model_factory.py, agent_run_with_metadata.py, prompt_composer.py)` | 2 | Agent instances + `run_with_metadata` wrapper |
+| `src/weekforge/models/llm_call_cost.py` | 2, 4 | `CallMetadata`, `RunCost` (extended with EUR in P4) |
+| `src/weekforge/workflows/e2e.py` | 3 | E2E validation workflow: Notion → agent → HITL → write |
+| `src/weekforge/cli.py` | 3 | Extended with `e2e` command (supersedes `llm-test`) |
 | `src/weekforge/models/pricing.py` | 4 | Per-model USD rates, `estimate_cost_eur` |
 
 ## Specification
@@ -173,9 +173,18 @@ Every LLM call captures metadata from Pydantic AI's `result.usage()` (Pydantic A
 | `cost_eur` | `estimate_cost_eur(model, in, out)` | Euro cost (added in Part 4; `0.0` until then) |
 
 ```python
-def run_with_metadata(agent: Agent, prompt: str) -> tuple[AgentRunResult, CallMetadata]:
-    """Wraps agent.run_sync() with perf_counter timing; returns typed result + metadata."""
+def run_with_metadata(
+    agent: Agent,
+    prompt: str,
+    message_history: list[ModelMessage] | None = None,
+) -> tuple[AgentRunResult, CallMetadata, list[ModelMessage]]:
+    """Wraps agent.run_sync() with perf_counter timing; returns typed result,
+    metadata, and the full message history (for feedback-loop reuse)."""
 ```
+
+The optional `message_history` + third return value enable multi-turn feedback
+loops (step 0d): the workflow persists the message list across HITL pauses and
+replays it on the next agent call so the model sees its own prior output.
 
 ### Run-Level Cost Accumulation
 
@@ -253,7 +262,7 @@ Pydantic AI reads `OPENAI_API_KEY` from the environment automatically for OpenAI
 
 ### Part 2 — Agent + Cost Infrastructure
 - [x] `test_agent` constructs from `resolve_llm_profile("reasoning")` with only the non-`None` model-settings fields wired in (temperature OR reasoning_effort, not both)
-- [ ] `test_agent`'s `system_prompt` is composed via the prompt-style composer described in [reference/prompt-style.md](../reference/prompt-style.md) (baseline: `CAVEMAN_MODE=false` leaves the prompt unchanged)
+- [x] `test_agent`'s `system_prompt` is composed via the prompt-style composer described in [reference/prompt-style.md](../reference/prompt-style.md) (baseline: `CAVEMAN_MODE=false` leaves the prompt unchanged)
 - [x] `CallMetadata` dataclass defined (`input_tokens` / `output_tokens` matching Pydantic AI `RunUsage`)
 - [x] `RunCost.add()` accumulates correctly (unit-testable with fake metadata)
 - [x] `RunCost.summary()` renders tokens + latency as a Rich-markup string (no euro yet)
@@ -269,11 +278,11 @@ Pydantic AI reads `OPENAI_API_KEY` from the environment automatically for OpenAI
 - [x] `uv run ruff check .` and `uv run mypy src/` pass
 
 ### Part 4 — Euro Cost Estimation
-- [ ] `PRICING` dict seeded with `gpt-5.4` and `gpt-5.4-nano` rates
-- [ ] `estimate_cost_eur` handles unknown models gracefully (returns `0.0` + warning)
-- [ ] `CallMetadata.cost_eur` populated at construction time
-- [ ] `RunCost.total_cost_eur` accumulates; `summary()` includes EUR total
-- [ ] `weekforge llm-test` summary now shows euro cost alongside tokens + latency
+- [x] `PRICING` dict seeded with `gpt-5.4` and `gpt-5.4-nano` rates
+- [x] `estimate_cost_eur` handles unknown models gracefully (returns `0.0` + warning)
+- [x] `CallMetadata.cost_eur` populated at construction time
+- [x] `RunCost.total_cost_eur` accumulates; `summary()` includes EUR total
+- [x] `weekforge e2e` summary shows euro cost alongside tokens + latency
 
 ## Reference
 

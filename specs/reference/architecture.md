@@ -51,6 +51,8 @@ Task classes resolve to `LLMProfile` via `resolve_llm_profile("reasoning")`. Age
 
 Every LLM call returns metadata via Pydantic AI's `result.usage()`: `input_tokens`, `output_tokens`. Latency captured via timing wrapper. `RunCost` accumulator tracks cost from every LLM call during workflow run — CLI displays total at completion.
 
+For multi-turn flows (feedback loops), `run_with_metadata` also accepts an optional `message_history` and returns the post-call message list via `result.all_messages()`. Workflows persist that list across HITL pauses using `ModelMessagesTypeAdapter.dump_python(..., mode="json")` / `validate_python`, so closing the terminal mid-conversation does not lose context on resume.
+
 ## Generic Notion Tool Layer
 
 All Notion interactions encapsulated in reusable Tier-0 tool layer. LLM never touches Notion directly; receives structured data from tools, returns structured outputs that tools write.
@@ -79,6 +81,7 @@ All Notion interactions encapsulated in reusable Tier-0 tool layer. LLM never to
 | `weekforge plan` | Start or resume planning lifecycle (Lifecycle A) |
 | `weekforge summarize` | Start or resume extraction lifecycle (Lifecycle B) |
 | `weekforge continue` | Resume from last checkpoint (any lifecycle) |
+| `weekforge e2e` | **Transitional (Phase 0 only).** End-to-end validation workflow — removed when `summarize` lands in step 1. |
 
 ### AuDHD-Informed Design Principles
 
@@ -142,7 +145,7 @@ weekforge/
 │       ├── agents/           # Pydantic AI agent definitions
 │       ├── tools/            # Notion tool layer + other tools
 │       ├── config/           # Model config, env loading
-│       └── models/           # State schemas, result types
+│       └── models/           # Domain data: pricing, LLM cost, workflow state
 ├── tests/
 ├── pyproject.toml
 ├── uv.lock

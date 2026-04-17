@@ -8,8 +8,8 @@
 |---|------|-------------|--------|
 | 0a | [Minimal Workflow](./steps/step-0a-minimal-workflow.md) | Workflow foundation: state, checkpoint, HITL, Pydantic AI | ✅ |
 | 0b | [Notion Tools](./steps/step-0b-notion-tools.md) | Notion tool layer: CRUD contracts + integration | ✅ |
-| 0c | [LLM Integration](./steps/step-0c-llm-integration.md) | Pydantic AI agent setup, model config, metadata capture | ⬜ |
-| 0d | [End-to-End](./steps/step-0d-end-to-end.md) | Full loop: Notion -> Agent -> HITL -> Notion + CLI | ⬜ |
+| 0c | [LLM Integration](./steps/step-0c-llm-integration.md) | Pydantic AI agent setup, model config, metadata capture | ✅ |
+| 0d | [End-to-End](./steps/step-0d-end-to-end.md) | Full loop: Notion -> Agent -> HITL -> Notion + CLI | ✅ |
 | 1 | [Extraction](./steps/step-1-extraction.md) | `summarize_week` — first real feature | ⬜ |
 | 2 | [Planning](./steps/step-2-planning.md) | `plan_week` with HITL collaborative shaping | ⬜ |
 | 3 | [Generation](./steps/step-3-generation.md) | `draft_session` + Deterministic Evaluator loop | ⬜ |

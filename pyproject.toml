@@ -36,6 +36,9 @@ target-version = "py313"
 select = ["E", "F", "I", "UP"] # pyflakes, pycodestyle, isort, pyupgrade
 ignore = ["E501"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.mypy]
 strict = true
 warn_return_any = true
