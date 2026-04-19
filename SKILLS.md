@@ -17,6 +17,11 @@ Project-level skills live in `.agents/skills/`.
 - **When loaded**: When creating, editing, reviewing, or tracking spec files in `specs/`.
 - **What it provides**: Frontmatter schema, status lifecycle, version bumping rules, change process, decision log protocol, and traceability matrix conventions.
 
+#### Prompt Review
+- **Path**: `.agents/skills/prompt-review/SKILL.md`
+- **When loaded**: When auditing, refactoring, or authoring LLM prompt files (persona, guardrails, instruction templates) in `src/weekforge/prompts/` or equivalents.
+- **What it provides**: Structure templates (XML-wrapped persona/guardrails), separation-of-concerns rules, duplication and conflict detection checklist, common anti-patterns, and Anthropic Claude 4.x best practices as of April 2026.
+
 ## Agents vs Skills
 
 | Concept | What it defines | When loaded | Example |
