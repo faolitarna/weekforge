@@ -107,7 +107,7 @@ Step transitions persist before each LLM call (same pattern as `agent` step in 1
 
 ### Failure handling
 
-- **Notion write failure** (either the summary row or PLAN_STATE): Tenacity retry. On terminal failure, checkpoint preserves the approved `WeekSummary` so user can `weekforge continue` without re-generating.
+- **Notion write failure** (either the summary row or PLAN_STATE): Tenacity retry. On terminal failure, checkpoint preserves the approved `WeekSummary` so user can `weekforge resume` without re-generating.
 - **PLAN_STATE row exists but malformed** (schema drift / manual edits): parse attempt raises `PlanStateParseError`. Surface to user with the option to bootstrap-regenerate (destructive) or abort. Default abort.
 - **Zero weekly summaries AND no PLAN_STATE** (bootstrap edge case): emit empty skeleton, do not call the LLM (no data to reason about).
 

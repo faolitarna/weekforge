@@ -5,6 +5,10 @@ class Settings(BaseSettings):
     notion_token: str
     notion_test_db_id: str
     openai_api_key: str
+    notion_db_training_sessions: str
+    notion_db_training_week_summaries: str
+    notion_db_training_templates: str
+    notion_user_profile_page_id: str
     fast_profile: str = "gpt-5.4-nano"
     reasoning_profile: str = "gpt-5.4"
     caveman_mode: bool = False

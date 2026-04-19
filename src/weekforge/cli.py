@@ -21,7 +21,7 @@ from rich.table import Table
 
 from weekforge.checkpoint import CheckpointStore
 
-app = typer.Typer(help="Weekforge — training week lifecycle manager.")
+app = typer.Typer(help="Weekforge — training week lifecycle manager.", add_completion=False)
 console = Console()
 
 # Relative to CWD — each project directory gets its own isolated checkpoint DB.
@@ -61,7 +61,7 @@ def _run_or_pause(tid: str, fn: Callable[[], None]) -> None:
     except KeyboardInterrupt:
         console.print(
             f"\n[yellow]Paused.[/yellow] Resume: "
-            f"[bold cyan]uv run weekforge continue --thread-id {tid}[/bold cyan]"
+            f"[bold cyan]uv run weekforge resume --thread-id {tid}[/bold cyan]"
         )
 
 
@@ -112,18 +112,22 @@ def plan() -> None:
     console.print("[dim]Not yet implemented (step 2).[/dim]")
 
 
+@app.command("summarize-week")
+def summarize_week(week: int = typer.Argument(..., help="Week number, e.g. 7")) -> None:
+    """Generate a weekly summary from completed training sessions."""
+    from weekforge.tools.formatting import format_week_prefix
+    from weekforge.workflows.summarize_week import run_summarize_week
+
+    store = _make_store()
+    tid = f"summarize-week-{format_week_prefix(week)}"
+    _run_or_pause(tid, lambda: run_summarize_week(week, store))
+
+
 @app.command()
-def summarize() -> None:
-    """Start or resume the extraction lifecycle (not yet implemented — step 1)."""
-    console.print("[dim]Not yet implemented (step 1).[/dim]")
-
-
-# `continue` is a Python keyword — bind the CLI name but define under a safe identifier.
-@app.command("continue")
 def resume(
     thread_id: str = typer.Option(..., help="Thread ID of the checkpoint to resume."),
 ) -> None:
-    """Resume from the last checkpoint (any lifecycle)."""
+    """Resume from the last checkpoint (any thread)."""
     store = _make_store()
     rec = store.load(thread_id)
     if rec is None:

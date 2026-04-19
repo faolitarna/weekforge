@@ -94,7 +94,7 @@ summarize_agent = Agent(
 
 @summarize_agent.instructions
 def _inject_user_profile(ctx: RunContext[SummarizeDeps]) -> str:
-    return "## Active User Profile\n\n" + ctx.deps.user_profile.prose_markdown
+    return "## Active User Profile\n\n" + ctx.deps.user_profile.markdown
 
 @summarize_agent.instructions
 def _inject_tier0_facts(ctx: RunContext[SummarizeDeps]) -> str:
@@ -171,14 +171,14 @@ def summarize(week: int = typer.Argument(...)) -> None:
     run_summarize(week_prefix, thread_id, store)
 ```
 
-Resume path: `weekforge continue --thread-id <id>` works automatically since `ExtractionState` is checkpointed at every step transition (same pattern as e2e).
+Resume path: `weekforge resume --thread-id <id>` works automatically since `ExtractionState` is checkpointed at every step transition (same pattern as e2e).
 
 ### Failure modes
 
 - Notion query failure → Tenacity retry (existing behavior in [notion_api_gateway.py](../../src/weekforge/tools/notion_api_gateway.py)).
 - Zero sessions for week → `RuntimeError("No sessions found for {W##}")`, CLI prints a clear recovery hint pointing at the `Week` property.
 - Agent structured-output validation error → surfaces as Pydantic AI's standard validation exception; workflow checkpoints the last good state so user can re-run without losing prior messages.
-- Checkpoint missing on `weekforge continue` → clear error, suggest re-running `weekforge summarize <week>`.
+- Checkpoint missing on `weekforge resume` → clear error, suggest re-running `weekforge summarize <week>`.
 
 ### Tests
 
@@ -193,7 +193,7 @@ Resume path: `weekforge continue --thread-id <id>` works automatically since `Ex
 - [ ] `@summarize_agent.instructions` decorators inject user profile and Tier-0 facts from `RunContext.deps`.
 - [ ] `ExtractionState` round-trips through JSON (checkpoint compatibility).
 - [ ] `run_summarize` executes overwrite_check → load_context → tier0_extract → agent → accept; each step persists before the next.
-- [ ] HITL accept panel displays `highlights` + `trend` prominently; feedback loop re-invokes agent with `message_history`; quit preserves state for `weekforge continue`.
+- [ ] HITL accept panel displays `highlights` + `trend` prominently; feedback loop re-invokes agent with `message_history`; quit preserves state for `weekforge resume`.
 - [ ] Agent output passes validation (Pydantic `WeekSummary`) and does not alter Tier-0 fields.
 - [ ] Zero-session input raises a `RuntimeError` with the week prefix in the message.
 - [ ] `write` step is still a placeholder (`NotImplementedError("Implemented in step-1d")`) — 1c is done when accept emits an approved state ready for 1d.

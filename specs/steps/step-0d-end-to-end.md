@@ -15,7 +15,7 @@ Step 0c complete (model config, Pydantic AI agents, metadata capture).
 | `src/weekforge/workflows/e2e.py` | Full end-to-end validation workflow with feedback loop |
 | `src/weekforge/agents/agent_run_with_metadata.py` | Extended: accept `message_history`, return updated messages |
 | `src/weekforge/hitl.py` | Extended: three-way prompt (approve / feedback / quit) |
-| Updates to `cli.py` | Finalize command structure, remove stepwise test commands (`echo`, `notion-test`, `llm-test`); add `e2e`, `plan`/`summarize` placeholders, `continue` |
+| Updates to `cli.py` | Finalize command structure, remove stepwise test commands (`echo`, `notion-test`, `llm-test`); add `e2e`, `plan`/`summarize` placeholders, `resume` |
 
 ## Specification
 
@@ -67,7 +67,7 @@ The agent sees its previous output and the user's feedback, enabling iterative r
 | `weekforge e2e` | **Transitional** — Phase-0 validation workflow. Subsumed by `summarize` in step 1 and removed then. |
 | `weekforge plan` | (Placeholder for step 2 — shows "not yet implemented") |
 | `weekforge summarize` | (Placeholder for step 1 — shows "not yet implemented") |
-| `weekforge continue --thread-id <tid>` | Resume from the last checkpoint (any lifecycle). Dispatches on the `workflow` field of the persisted record. |
+| `weekforge resume --thread-id <tid>` | Resume from the last checkpoint (any lifecycle). Dispatches on the `workflow` field of the persisted record. |
 
 Remove the stepwise test commands (`echo`, `notion-test`, `llm-test`) and their workflow modules + tests. They are superseded by the single `e2e` validation command. `e2e` itself is marked transitional and carries no long-term contract — it exists only until step 1 ships the real `summarize` lifecycle.
 
@@ -95,7 +95,7 @@ On completion, show a Rich panel with:
 - [x] Run summary displayed at completion (cost, timing, calls)
 - [x] Startup validation catches missing env vars with clear error
 - [x] `weekforge` shows available commands and active checkpoint status
-- [x] `weekforge continue` resumes any interrupted run
+- [x] `weekforge resume` resumes any interrupted run
 - [x] Stepwise test commands from 0a-0c removed (`echo`, `notion-test`, `llm-test`); single `e2e` command is the sole validation entry point (transitional, removed in step 1)
 - [x] `uv run ruff check .` and `uv run mypy src/` pass
 

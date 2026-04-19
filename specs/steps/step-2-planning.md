@@ -95,7 +95,7 @@ class PlanningDeps:
     template_sessions: list[dict]
     feedback_context: dict
     active_flare: bool
-    user_profile: dict
+    user_profile: UserProfile  # markdown blob from Notion page (DEC-007)
     guardrails: dict
 ```
 

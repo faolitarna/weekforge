@@ -80,7 +80,7 @@ All Notion interactions encapsulated in reusable Tier-0 tool layer. LLM never to
 | `weekforge` | Show available commands + active checkpoint status |
 | `weekforge plan` | Start or resume planning lifecycle (Lifecycle A) |
 | `weekforge summarize` | Start or resume extraction lifecycle (Lifecycle B) |
-| `weekforge continue` | Resume from last checkpoint (any lifecycle) |
+| `weekforge resume` | Resume from last checkpoint (any lifecycle) |
 | `weekforge e2e` | **Transitional (Phase 0 only).** End-to-end validation workflow — removed when `summarize` lands in step 1. |
 
 ### AuDHD-Informed Design Principles
@@ -91,7 +91,7 @@ Grounded in user's cognitive profile (`references/szymi-blueprint.md`):
 - **Progressive disclosure.** Summary first, depth on request.
 - **Scannable output.** Fixed, predictable section headers. No prose walls.
 - **Clear decision points.** Every HITL pause: (1) what you're looking at, (2) options, (3) recommendation.
-- **Flow-compatible momentum.** Approve -> auto-continue -> next draft preserves flow state.
+- **Flow-compatible momentum.** Approve -> auto-resume -> next draft preserves flow state.
 - **Dopamine milestones.** Progress visualization (`3/8 ████░░░░`), completion celebrations.
 - **Refinement over generation.** Present draft, ask "what would you change?" — never "what do you want?"
 

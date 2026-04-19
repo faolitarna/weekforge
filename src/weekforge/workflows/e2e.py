@@ -65,7 +65,7 @@ def run_e2e(database_id: str | None, thread_id: str, store: CheckpointStore) -> 
     Fresh run starts at `query`; resume jumps to whichever step is persisted.
     Agent calls are checkpointed BEFORE the network call so a crash mid-flight
     re-runs only the single interrupted turn on resume. On quit, the checkpoint
-    is preserved for `weekforge continue`; on approve, it is deleted and the
+    is preserved for `weekforge resume`; on approve, it is deleted and the
     run summary panel is rendered.
     """
     record = store.load(thread_id)
@@ -117,7 +117,7 @@ def run_e2e(database_id: str | None, thread_id: str, store: CheckpointStore) -> 
             elif decision.quit:
                 _console.print(
                     f"[yellow]Paused.[/yellow] Resume: "
-                    f"[bold cyan]uv run weekforge continue --thread-id {thread_id}[/bold cyan]"
+                    f"[bold cyan]uv run weekforge resume --thread-id {thread_id}[/bold cyan]"
                 )
                 return
             else:

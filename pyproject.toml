@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "weekforge"
 version = "0.1.0"
@@ -19,6 +23,12 @@ weekforge = "weekforge.cli:app"
 
 [tool.uv]
 package = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/weekforge"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/weekforge/prompts" = "weekforge/prompts"
 
 [dependency-groups]
 dev = [
