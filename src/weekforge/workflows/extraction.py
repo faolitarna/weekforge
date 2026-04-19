@@ -17,6 +17,27 @@ _logger = logging.getLogger(__name__)
 WORKFLOW = "extraction"
 MAX_ITERATIONS = 3
 
+
+def _get_text_prop(page: dict, prop_name: str) -> str:
+    items = page.get("properties", {}).get(prop_name, {}).get("rich_text", [])
+    return items[0].get("plain_text", "") if items else ""
+
+
+def _get_title_property_name(database_id: str) -> str:
+    """Discover the title property name from a Notion database schema."""
+    from weekforge.tools.notion_api_gateway import _client, _retry_api_call
+    db = _retry_api_call(_client.databases.retrieve, database_id=database_id)
+    # Standard public API format
+    for prop_name, prop_def in db.get("properties", {}).items():
+        if prop_def.get("type") == "title":
+            return prop_name
+    # Internal data-source format
+    schema = db.get("data_sources", [{}])[0].get("schema", {})
+    for prop_name, prop_def in schema.items():
+        if prop_def.get("type") == "title":
+            return prop_name
+    return "Title"  # fallback
+
 def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> None:
     record = store.load(thread_id)
     if record is not None and record.workflow == WORKFLOW:
@@ -35,42 +56,112 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
             store.save(thread_id, WORKFLOW, state.step, state)
 
         elif state.step == "load_context":
-            # Placeholder for context loading
+            from weekforge.config.env import settings
+            from weekforge.config.user_profile_loader import load_user_profile
+            from weekforge.tools import notion_api_gateway as notion
+            from weekforge.tools.notion_api_gateway import _client as notion_client
+            from weekforge.tools.raw_session_collector import assemble_raw_week
+
+            _logger.info("Loading context for %s", state.week_prefix)
+
+            # Load user profile
+            profile = load_user_profile()
+            state.user_profile_markdown = profile.markdown
+
+            # Fetch session pages for this week from Notion
+            week_num_str = str(int(state.week_prefix[1:]))
+            all_session_pages = notion.query(database_id=settings.notion_db_training_sessions)
+            session_pages = [p for p in all_session_pages if _get_text_prop(p, "Week") == week_num_str]
+            if not session_pages:
+                raise RuntimeError(
+                    f"No session pages found for {state.week_prefix} in training_sessions DB."
+                )
+
+            # Assemble raw week data
+            raw_week = assemble_raw_week(
+                week_prefix=state.week_prefix,
+                session_pages=session_pages,
+                notion_client=notion_client,
+                planned_plan_markdown=None,
+            )
+            # Serialize sessions for checkpoint persistence (exclude bulky raw block dicts)
+            import json
+            state.raw_sessions_json = json.dumps([
+                {"name": s.name, "page_id": s.page_id,
+                 "blocks": [{"block_type": b.block_type, "text": b.text, "checked": b.checked} for b in s.blocks],
+                 "comments": s.comments}
+                for s in raw_week.sessions
+            ])
+
+            _console.print(f"[green]Loaded {len(raw_week.sessions)} sessions for {state.week_prefix}[/green]")
             state.step = "tier0_extract"
             store.save(thread_id, WORKFLOW, state.step, state)
 
         elif state.step == "tier0_extract":
-            # Placeholder for 1b extract. We need a dummy WeekSummary since we don't have it wired yet.
-            # In tests, we will inject a state with tier0_summary.
-            if not state.tier0_summary:
-                # Provide a minimalistic one for testing the agent flow if not present.
-                # Actually, the spec for 1c tests says they will feed a canned tier0 summary.
-                raise RuntimeError(
-                    f"tier0_summary missing for {state.week_prefix}. (1b extraction wire-up missing?)"
+            import json
+            from weekforge.models.raw_week_data import RawBlock, RawSession
+            from weekforge.tools.raw_session_collector import compute_checkbox_analysis
+            from weekforge.models.week_summary import SessionLine, PainStatus
+
+            _logger.info("Building tier0 summary for %s", state.week_prefix)
+
+            # Reconstruct sessions from checkpoint-safe JSON
+            raw_sessions_data = json.loads(state.raw_sessions_json or "[]")
+            sessions = [
+                RawSession(
+                    page_id=s["page_id"], name=s["name"],
+                    blocks=[RawBlock(block_type=b["block_type"], text=b["text"], checked=b["checked"], raw={}) for b in s["blocks"]],
+                    comments=s["comments"],
                 )
+                for s in raw_sessions_data
+            ]
+
+            # Compute checkbox analysis (mechanical Tier-0)
+            implicit_fb = compute_checkbox_analysis(sessions)
+
+            # Build skeleton session lines
+            session_lines = []
+            for s_data in raw_sessions_data:
+                blocks = s_data["blocks"]
+                total = sum(1 for b in blocks if b["block_type"] == "to_do")
+                done = sum(1 for b in blocks if b["block_type"] == "to_do" and b["checked"])
+                status = "done" if total > 0 and done == total else ("partial" if done > 0 else "skip")
+                session_lines.append(SessionLine(
+                    name=s_data["name"],
+                    status=status,
+                    exercises_done=done,
+                    exercises_total=total,
+                    pain_status=None,
+                    comment="",
+                ))
+
+            completion_pct = round(implicit_fb.total_checked / max(implicit_fb.total_exercises, 1) * 100)
+            state.tier0_summary = WeekSummary(
+                week_prefix=state.week_prefix,
+                completion=f"{completion_pct}% ({implicit_fb.total_checked}/{implicit_fb.total_exercises})",
+                sessions=session_lines,
+                exercise_log=[],
+                pain_status=PainStatus(si_joint=None, other=None),
+                implicit_feedback=implicit_fb,
+            )
+            _console.print(f"[green]Tier-0 summary: {state.tier0_summary.completion}[/green]")
             state.step = "agent"
             store.save(thread_id, WORKFLOW, state.step, state)
 
         elif state.step == "agent":
             store.save(thread_id, WORKFLOW, state.step, state)
             prev = ModelMessagesTypeAdapter.validate_python(state.messages_json) if state.messages_json else None
-            
-            # The deps injected
-            from weekforge.models.user_profile import UserProfile
-            from weekforge.models.week_summary import ImplicitFeedback, SectionRates
 
-            # Dummy profile and feedback if not populated in context
+            from weekforge.models.user_profile import UserProfile
+
+            # Use real profile if loaded, fallback for tests
+            profile_md = state.user_profile_markdown or "Not provided"
+            profile = UserProfile.model_construct(page_id="state", markdown=profile_md)
+
             deps = SummarizeDeps(
-                user_profile=UserProfile.model_construct(markdown="Not provided"),
-                implicit_feedback=ImplicitFeedback(
-                    total_checked=0,
-                    total_exercises=0,
-                    per_session=[],
-                    section_rates=SectionRates(warmup_pct=0.0, main_pct=0.0, cooldown_pct=0.0),
-                    frequently_skipped=[],
-                    always_completed=[]
-                ),
-                plan_adherence=None,
+                user_profile=profile,
+                implicit_feedback=state.tier0_summary.implicit_feedback,
+                plan_adherence=state.tier0_summary.plan_adherence,
                 tier0_summary_json=state.tier0_summary.model_dump_json(exclude_none=True),
             )
 
@@ -140,27 +231,24 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
             code_block = f"```text\n{rendered}\n```"
             
             _logger.info("Writing week summary to Notion.")
-            records = notion.query(
-                database_id=settings.notion_db_training_week_summaries,
-                filters=[{"property": "Week", "rich_text": {"equals": state.week_prefix}}]
-            )
-            
+            all_summary_pages = notion.query(database_id=settings.notion_db_training_week_summaries)
+            records = [p for p in all_summary_pages if _get_text_prop(p, "Week") == state.week_prefix]
+
             if records:
                 page_id = records[0]["id"]
                 notion.update(
                     page_id=page_id,
-                    properties={"Summary": {"rich_text": [{"text": {"content": "".join(rendered[:2000])}}]}},
                     content=code_block
                 )
                 state.written_page_id = page_id
             else:
                 _logger.warning("No existing row for week %s found! Creating a new one.", state.week_prefix)
+                title_prop = _get_title_property_name(settings.notion_db_training_week_summaries)
                 page_id = notion.create(
                     database_id=settings.notion_db_training_week_summaries,
                     properties={
                         "Week": {"rich_text": [{"text": {"content": state.week_prefix}}]},
-                        "Name": {"title": [{"text": {"content": f"Week {state.week_prefix} Summary"}}]}, 
-                        "Summary": {"rich_text": [{"text": {"content": "".join(rendered[:2000])}}]},
+                        title_prop: {"title": [{"text": {"content": f"Week {state.week_prefix} Summary"}}]},
                     },
                     content=code_block
                 )
@@ -175,10 +263,8 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
             from weekforge.config.env import settings
             
             _logger.info("Checking PLAN_STATE.")
-            records = notion.query(
-                database_id=settings.notion_db_training_week_summaries,
-                filters=[{"property": "Week", "rich_text": {"equals": "PLAN_STATE"}}]
-            )
+            all_summary_pages = notion.query(database_id=settings.notion_db_training_week_summaries)
+            records = [p for p in all_summary_pages if _get_text_prop(p, "Week") == "PLAN_STATE"]
             
             if records:
                 page_id = records[0]["id"]
@@ -204,7 +290,6 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
             store.save(thread_id, WORKFLOW, state.step, state)
             from weekforge.agents.plan_state_agent import plan_state_agent, PlanStateDeps
             from weekforge.tools.plan_state import render_plan_state, update_mechanical_fields, parse_plan_state, PlanState
-            from weekforge.agents.agent_run_with_metadata import run_with_metadata
             from weekforge.tools import notion_api_gateway as notion
             from weekforge.config.env import settings
             
@@ -227,9 +312,10 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
                 code_block = f"```text\n{rendered_ps}\n```"
                 
                 assert state.plan_state_page_id is not None
+                title_prop = _get_title_property_name(settings.notion_db_training_week_summaries)
                 notion.update(
                     page_id=state.plan_state_page_id,
-                    properties={"Name": {"title": [{"text": {"content": f"Plan State - W01-{state.week_prefix}"}}]}},
+                    properties={title_prop: {"title": [{"text": {"content": f"Plan State - W01-{state.week_prefix}"}}]}},
                     content=code_block
                 )
             else:
@@ -245,15 +331,16 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
                 rendered_ps = render_plan_state(updated_ps, state.week_prefix)
                 code_block = f"```text\n{rendered_ps}\n```"
                 
-                notion.create(
+                title_prop = _get_title_property_name(settings.notion_db_training_week_summaries)
+                ps_page_id = notion.create(
                     database_id=settings.notion_db_training_week_summaries,
                     properties={
                         "Week": {"rich_text": [{"text": {"content": "PLAN_STATE"}}]},
-                        "Name": {"title": [{"text": {"content": f"Plan State - W01-{state.week_prefix}"}}]},
-                        "Summary": {"rich_text": [{"text": {"content": "".join(rendered_ps[:2000])}}]},
+                        title_prop: {"title": [{"text": {"content": f"Plan State - W01-{state.week_prefix}"}}]},
                     },
                     content=code_block
                 )
+                _logger.info("Created PLAN_STATE page: %s", ps_page_id)
                 
             state.step = "done"
             store.save(thread_id, WORKFLOW, state.step, state)
@@ -262,3 +349,4 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
             raise RuntimeError(f"Unknown step: {state.step!r}")
 
     store.delete(thread_id)
+    _console.print(Panel(cost.summary(), title=f"Run complete — {state.week_prefix}", border_style="green"))

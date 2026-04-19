@@ -1,4 +1,4 @@
-from weekforge.models.week_summary import WeekSummary, SessionLine, ExerciseLogEntry, CardioEntry, ClimbingEntry, PainStatus, ImplicitFeedback, SectionRates, PlanAdherence
+from weekforge.models.week_summary import WeekSummary, SessionLine, ExerciseLogEntry, CardioEntry, ClimbingEntry, PainStatus, ImplicitFeedback, SectionRates, PlanAdherence, ModificationPattern
 from weekforge.tools.week_summary_renderer import render_week_summary
 
 def test_render_week_summary():
@@ -22,7 +22,7 @@ def test_render_week_summary():
         issues=["Bad sleep"],
         wins=["Felt strong"],
         recommendations_next=["Sleep more"],
-        plan_adherence=PlanAdherence(planned_total=12, completed=10, modified=1, skipped=1, modification_patterns=[("A", "B", "reason")], skip_patterns=[]),
+        plan_adherence=PlanAdherence(planned_total=12, completed=10, modified=1, skipped=1, modification_patterns=[ModificationPattern(exercise="A", planned="B", actual="reason")], skip_patterns=[]),
         implicit_feedback=ImplicitFeedback(
             total_checked=10,
             total_exercises=12,

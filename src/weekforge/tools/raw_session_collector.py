@@ -2,7 +2,7 @@ import logging
 from collections import defaultdict
 
 from weekforge.models.raw_week_data import RawBlock, RawSession, RawWeekData
-from weekforge.models.week_summary import ImplicitFeedback, SectionRates, SkippedPattern
+from weekforge.models.week_summary import ImplicitFeedback, SectionRates, SessionCheckCount, SkippedPattern
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ def collect_raw_sessions(
 def compute_checkbox_analysis(sessions: list[RawSession]) -> ImplicitFeedback:
     total_checked = 0
     total_exercises = 0
-    per_session: list[tuple[str, int, int]] = []
+    per_session: list[SessionCheckCount] = []
 
     # section tracking: {exercise_text: {section: {checked: int, total: int}}}
     section_buckets: dict[str, dict[str, dict[str, int]]] = defaultdict(
@@ -109,7 +109,7 @@ def compute_checkbox_analysis(sessions: list[RawSession]) -> ImplicitFeedback:
                     total_checked += 1
                     section_checked[current_section] += 1
                     exercise_stats[block.text]["checked"] += 1
-        per_session.append((session.name, s_checked, s_total))
+        per_session.append(SessionCheckCount(session_name=session.name, checked=s_checked, total=s_total))
 
     def _pct(checked: int, total: int) -> float:
         return round(checked / total, 4) if total else 0.0

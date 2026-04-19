@@ -7,6 +7,8 @@ from weekforge.models.week_summary import WeekSummary
 class ExtractionState(BaseModel):
     week_prefix: str
     overwrite_confirmed: bool = False
+    user_profile_markdown: str | None = None
+    raw_sessions_json: str | None = None
     tier0_summary: WeekSummary | None = None
     last_output: WeekSummary | None = None
     messages_json: list[dict[str, Any]] = Field(default_factory=list)

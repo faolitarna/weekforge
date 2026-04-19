@@ -117,11 +117,6 @@ def query(database_id: str, filters: list[dict[str, Any]] | None = None) -> list
         raise NotionAPIError(f"Database {database_id} does not expose a valid data_source.") from e
 
     query_args: dict[str, Any] = {"data_source_id": data_source_id}
-    if filters:
-        if len(filters) == 1:
-            query_args["filter_properties"] = filters[0]
-        else:
-            query_args["filter_properties"] = {"and": filters}
 
     while has_more:
         if next_cursor:
@@ -173,15 +168,24 @@ def create(database_id: str, properties: dict[str, Any], content: str) -> str:
     objects. Returns the new page's ID.
     """
     blocks = convert_markdown_to_blocks(content)
+    first_batch, remaining = blocks[:100], blocks[100:]
 
     response = _retry_api_call(
         _client.pages.create,
         parent={"database_id": database_id},
         properties=properties,
-        children=blocks
+        children=first_batch,
     )
+    page_id = str(response["id"])
 
-    return str(response["id"])
+    for i in range(0, len(remaining), 100):
+        _retry_api_call(
+            _client.blocks.children.append,
+            block_id=page_id,
+            children=remaining[i : i + 100],
+        )
+
+    return page_id
 
 
 def update(page_id: str, properties: dict[str, Any] | None = None, content: str | None = None) -> None:
@@ -208,9 +212,9 @@ def update(page_id: str, properties: dict[str, Any] | None = None, content: str 
             _retry_api_call(_client.blocks.delete, block_id=block["id"])
 
         new_blocks = convert_markdown_to_blocks(content)
-        if new_blocks:
+        for i in range(0, len(new_blocks), 100):
             _retry_api_call(
                 _client.blocks.children.append,
                 block_id=page_id,
-                children=new_blocks
+                children=new_blocks[i : i + 100],
             )

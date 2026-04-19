@@ -68,18 +68,18 @@ def render_week_summary(summary: WeekSummary) -> str:
         lines.append(f"- Total: {p.planned_total} (Completed: {p.completed}, Modified: {p.modified}, Skipped: {p.skipped})")
         if p.modification_patterns:
             lines.append("- Modifications:")
-            for m0, m1, m2 in p.modification_patterns:
-                lines.append(f"  - {m0}: {m1} -> {m2}")
+            for m in p.modification_patterns:
+                lines.append(f"  - {m.exercise}: {m.planned} -> {m.actual}")
         if p.skip_patterns:
             lines.append("- Skips:")
-            for s0, s1 in p.skip_patterns:
-                lines.append(f"  - {s0}: {s1}")
+            for s in p.skip_patterns:
+                lines.append(f"  - {s.exercise}: {s.reason}")
         lines.append("")
 
     lines.append("IMPLICIT_FEEDBACK:")
     lines.append(f"- Total Checked: {summary.implicit_feedback.total_checked}/{summary.implicit_feedback.total_exercises}")
-    for p_name, p_done, p_tot in summary.implicit_feedback.per_session:
-        lines.append(f"- Session {p_name}: {p_done}/{p_tot}")
+    for ps in summary.implicit_feedback.per_session:
+        lines.append(f"- Session {ps.session_name}: {ps.checked}/{ps.total}")
     lines.append("- Section Completion:")
     sr = summary.implicit_feedback.section_rates
     lines.append(f"  - Warmup: {sr.warmup_pct * 100:.0f}%")

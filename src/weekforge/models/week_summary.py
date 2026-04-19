@@ -54,13 +54,30 @@ class SkippedPattern(BaseModel):
     skip_rate: float
 
 
+class SessionCheckCount(BaseModel):
+    session_name: str
+    checked: int
+    total: int
+
+
 class ImplicitFeedback(BaseModel):
     total_checked: int
     total_exercises: int
-    per_session: list[tuple[str, int, int]]
+    per_session: list[SessionCheckCount]
     section_rates: SectionRates
     frequently_skipped: list[SkippedPattern]
     always_completed: list[str]
+
+
+class ModificationPattern(BaseModel):
+    exercise: str
+    planned: str
+    actual: str
+
+
+class SkipPattern(BaseModel):
+    exercise: str
+    reason: str
 
 
 class PlanAdherence(BaseModel):
@@ -68,8 +85,8 @@ class PlanAdherence(BaseModel):
     completed: int
     modified: int
     skipped: int
-    modification_patterns: list[tuple[str, str, str]]
-    skip_patterns: list[tuple[str, str]]
+    modification_patterns: list[ModificationPattern]
+    skip_patterns: list[SkipPattern]
 
 
 class WeekSummary(BaseModel):

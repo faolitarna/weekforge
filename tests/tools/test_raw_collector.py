@@ -90,9 +90,10 @@ def test_compute_checkbox_analysis_counts():
     result = compute_checkbox_analysis(sessions)
     assert result.total_checked == 4
     assert result.total_exercises == 6
-    assert ("Mon", 2, 3) in result.per_session
-    assert ("Wed", 1, 2) in result.per_session
-    assert ("Fri", 1, 1) in result.per_session
+    names_and_counts = [(ps.session_name, ps.checked, ps.total) for ps in result.per_session]
+    assert ("Mon", 2, 3) in names_and_counts
+    assert ("Wed", 1, 2) in names_and_counts
+    assert ("Fri", 1, 1) in names_and_counts
 
 
 def test_compute_checkbox_analysis_section_rates():
