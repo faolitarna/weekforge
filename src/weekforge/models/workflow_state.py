@@ -14,4 +14,10 @@ class ExtractionState(BaseModel):
     pending_feedback: str | None = None
     step: str = "overwrite_check"
     written_page_id: str | None = None
+    
+    # PLAN_STATE fields
+    is_bootstrap: bool | None = None
+    plan_state_raw: str | None = None
+    plan_state_page_id: str | None = None
+    
     started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

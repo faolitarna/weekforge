@@ -19,6 +19,7 @@ from weekforge.models.pricing import estimate_cost_eur
 def run_with_metadata(
     agent: Agent[Any, Any],
     prompt: str,
+    deps: Any | None = None,
     message_history: list[ModelMessage] | None = None,
 ) -> tuple[Any, CallMetadata, list[ModelMessage]]:
     """Run an agent synchronously; capture metadata and full message history.
@@ -30,7 +31,7 @@ def run_with_metadata(
     Calls `agent.run_sync()` — blocks the event loop if called from an async context.
     """
     t0 = time.perf_counter()
-    result = agent.run_sync(prompt, message_history=message_history)
+    result = agent.run_sync(prompt, deps=deps, message_history=message_history)
     latency_ms = int((time.perf_counter() - t0) * 1000)
     usage = result.usage()
     model = agent.model

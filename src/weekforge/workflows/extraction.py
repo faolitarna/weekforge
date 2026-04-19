@@ -24,6 +24,10 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
     else:
         state = ExtractionState(week_prefix=week_prefix)
 
+    cost = RunCost()
+    for c in state.calls:
+        cost.add(c)
+
     while state.step != "done":
         if state.step == "overwrite_check":
             # Placeholder for 1d
@@ -80,15 +84,12 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
             state.last_output = result.output
             state.messages_json = ModelMessagesTypeAdapter.dump_python(new_messages, mode="json")
             state.calls.append(meta)
+            cost.add(meta)
             state.pending_feedback = None
             state.step = "accept"
 
         elif state.step == "accept":
             assert state.last_output is not None
-            
-            cost = RunCost()
-            for c in state.calls:
-                cost.add(c)
             
             highlights_text = "\n".join(f"- {h}" for h in state.last_output.highlights)
             trend_text = state.last_output.trend or "N/A"
@@ -130,7 +131,132 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
 
         elif state.step == "write":
             store.save(thread_id, WORKFLOW, state.step, state)
-            raise NotImplementedError("Implemented in step-1d")
+            assert state.last_output is not None
+            from weekforge.tools.week_summary_renderer import render_week_summary
+            from weekforge.tools import notion_api_gateway as notion
+            from weekforge.config.env import settings
+            
+            rendered = render_week_summary(state.last_output)
+            code_block = f"```text\n{rendered}\n```"
+            
+            _logger.info("Writing week summary to Notion.")
+            records = notion.query(
+                database_id=settings.notion_db_training_week_summaries,
+                filters=[{"property": "Week", "rich_text": {"equals": state.week_prefix}}]
+            )
+            
+            if records:
+                page_id = records[0]["id"]
+                notion.update(
+                    page_id=page_id,
+                    properties={"Summary": {"rich_text": [{"text": {"content": "".join(rendered[:2000])}}]}},
+                    content=code_block
+                )
+                state.written_page_id = page_id
+            else:
+                _logger.warning("No existing row for week %s found! Creating a new one.", state.week_prefix)
+                page_id = notion.create(
+                    database_id=settings.notion_db_training_week_summaries,
+                    properties={
+                        "Week": {"rich_text": [{"text": {"content": state.week_prefix}}]},
+                        "Name": {"title": [{"text": {"content": f"Week {state.week_prefix} Summary"}}]}, 
+                        "Summary": {"rich_text": [{"text": {"content": "".join(rendered[:2000])}}]},
+                    },
+                    content=code_block
+                )
+                state.written_page_id = page_id
+                
+            state.step = "plan_state_check"
+            store.save(thread_id, WORKFLOW, state.step, state)
+
+        elif state.step == "plan_state_check":
+            store.save(thread_id, WORKFLOW, state.step, state)
+            from weekforge.tools import notion_api_gateway as notion
+            from weekforge.config.env import settings
+            
+            _logger.info("Checking PLAN_STATE.")
+            records = notion.query(
+                database_id=settings.notion_db_training_week_summaries,
+                filters=[{"property": "Week", "rich_text": {"equals": "PLAN_STATE"}}]
+            )
+            
+            if records:
+                page_id = records[0]["id"]
+                page = notion.fetch(page_id)
+                content_blocks = page.get("content", [])
+                raw_text = ""
+                for block in content_blocks:
+                    if block["type"] == "code":
+                        raw_text += "".join(t["text"]["content"] for t in block["code"]["rich_text"]) + "\n"
+                    elif block["type"] == "paragraph" and block.get("paragraph", {}).get("rich_text"):
+                        raw_text += "".join(t["text"]["content"] for t in block["paragraph"]["rich_text"]) + "\n"
+
+                state.plan_state_raw = raw_text
+                state.plan_state_page_id = page_id
+                state.is_bootstrap = False
+            else:
+                state.is_bootstrap = True
+                
+            state.step = "plan_state_update"
+            store.save(thread_id, WORKFLOW, state.step, state)
+            
+        elif state.step == "plan_state_update":
+            store.save(thread_id, WORKFLOW, state.step, state)
+            from weekforge.agents.plan_state_agent import plan_state_agent, PlanStateDeps
+            from weekforge.tools.plan_state import render_plan_state, update_mechanical_fields, parse_plan_state, PlanState
+            from weekforge.agents.agent_run_with_metadata import run_with_metadata
+            from weekforge.tools import notion_api_gateway as notion
+            from weekforge.config.env import settings
+            
+            assert state.is_bootstrap is not None
+            
+            if not state.is_bootstrap:
+                _logger.info("Running incremental PLAN_STATE update.")
+                existing_ps = parse_plan_state(state.plan_state_raw or "")
+                existing_ps = update_mechanical_fields(existing_ps, state.last_output)
+                
+                deps = PlanStateDeps(existing_plan_state=existing_ps, new_week=state.last_output)
+                prompt = "Update the plan state logically based on the new week."
+                result, meta, _ = run_with_metadata(
+                    plan_state_agent, prompt, deps=deps, message_history=None
+                )
+                updated_ps = result.output
+                cost.add(meta)
+                
+                rendered_ps = render_plan_state(updated_ps, state.week_prefix)
+                code_block = f"```text\n{rendered_ps}\n```"
+                
+                assert state.plan_state_page_id is not None
+                notion.update(
+                    page_id=state.plan_state_page_id,
+                    properties={"Name": {"title": [{"text": {"content": f"Plan State - W01-{state.week_prefix}"}}]}},
+                    content=code_block
+                )
+            else:
+                _logger.info("Bootstrapping PLAN_STATE.")
+                deps = PlanStateDeps(existing_plan_state=PlanState(), all_weeks=[state.last_output])
+                prompt = "Bootstrap plan state from provided weeks."
+                result, meta, _ = run_with_metadata(
+                    plan_state_agent, prompt, deps=deps, message_history=None
+                )
+                updated_ps = result.output
+                cost.add(meta)
+                
+                rendered_ps = render_plan_state(updated_ps, state.week_prefix)
+                code_block = f"```text\n{rendered_ps}\n```"
+                
+                notion.create(
+                    database_id=settings.notion_db_training_week_summaries,
+                    properties={
+                        "Week": {"rich_text": [{"text": {"content": "PLAN_STATE"}}]},
+                        "Name": {"title": [{"text": {"content": f"Plan State - W01-{state.week_prefix}"}}]},
+                        "Summary": {"rich_text": [{"text": {"content": "".join(rendered_ps[:2000])}}]},
+                    },
+                    content=code_block
+                )
+                
+            state.step = "done"
+            store.save(thread_id, WORKFLOW, state.step, state)
         
         else:
             raise RuntimeError(f"Unknown step: {state.step!r}")
