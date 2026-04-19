@@ -1,133 +1,66 @@
-# Step 1: Extraction Subsystem (`summarize_week`)
+# Step 1: Extraction Subsystem (`summarize_week`) — Index
 
 ## Goal
 
-Build the first real feature — post-execution extraction. Summarize a completed training week, generate feedback, and manage PLAN_STATE.
+Build post-execution extraction. Summarize a completed training week, generate feedback, and manage PLAN_STATE. Faithfully recreates `source-material/.claude/commands/summarize_week.md` in the Weekforge architecture (Tier-0 Python for deterministic work, Tier-2 Pydantic AI for synthesis).
 
 ## Prerequisites
 
 Step 0d complete (all infrastructure validated end-to-end).
 
-## What You're Building
+## Sub-Step Sequence
 
-| File | Purpose |
-|------|---------|
-| `src/weekforge/workflows/extraction.py` | Extraction workflow (Lifecycle B) |
-| `src/weekforge/tools/extraction.py` | Feature-specific tool functions (query sessions, parse blocks) |
-| `src/weekforge/agents/ (e2e_agent.py, openai_model_factory.py, agent_run_with_metadata.py, prompt_composer.py)` | Add `summarize_agent` definition |
-| `src/weekforge/models/workflow_state.py` | Extend with extraction-specific state model |
-| Updates to `cli.py` | Wire `weekforge summarize` command |
+Step 1 is split into four sub-steps so each can be implemented independently by a weaker model. Each sub-step has its own input contract (the artifacts produced by the previous sub-step) and acceptance criteria.
 
-## Specification
+| # | Sub-Step | Focus | Status |
+|---|----------|-------|--------|
+| 1a | [Context & CLI](./step-1a-context-and-cli.md) | Prompts dir (persona, guardrails), `.env` DB IDs, user-profile Notion DB + loader, `weekforge summarize <week>` CLI | ⬜ |
+| 1b | [Tier-0 Extraction](./step-1b-tier0-extraction.md) | Pure-Python parsing of sessions, role classification, checkbox analysis, delta analysis. Pydantic `WeekSummary` models. | ⬜ |
+| 1c | [Summary Agent & Workflow](./step-1c-summary-agent.md) | `summarize_agent` (Pydantic AI), `extraction.py` workflow, single HITL acceptance gate with feedback loop | ⬜ |
+| 1d | [Notion Write & PLAN_STATE](./step-1d-notion-write-and-plan-state.md) | `WeekSummary` → legacy text renderer, Notion write, PLAN_STATE incremental/bootstrap | ⬜ |
 
-### Overview
+## Architectural Summary
 
-`summarize_week` runs independently and on-demand after the physical training week is complete. It aggregates executed sessions, extracts feedback, calculates adherence, and updates the global PLAN_STATE.
+- **Source material fidelity.** Every behavior from `summarize_week.md` — week-prefix parse, existing-summary overwrite check, exercise role classification, checkbox analysis, delta analysis, summary format, PLAN_STATE update — maps to a named acceptance criterion in one of the sub-steps.
+- **Tier split.** Deterministic work (parsing, arithmetic, format rendering) is Tier-0 Python in `tools/extraction.py`. Synthesis (interpretation, wins/issues, recommendations, highlights/trend) is Tier-2 in `summarize_agent`.
+- **HITL shape.** One gate only: *accept summary*. Fetch validation removed — Notion API fetch is trusted; a genuinely empty result is a hard fail with a clear message. The accept gate renders `highlights` + `trend` for quick review, with the full `WeekSummary` available as a collapsed panel; feedback re-runs the agent with message history (same pattern as [e2e.py](../../src/weekforge/workflows/e2e.py)).
+- **Prompt composition.** `summarize_agent` uses Pydantic AI `instructions=` (static, for persona + guardrails, cacheable prefix) plus `@agent.instructions` decorators (dynamic, for per-run user profile and Tier-0 facts via `RunContext`). See sub-step 1c for the composition.
+- **Config storage split.** Persona and guardrails ship as local markdown in `src/weekforge/prompts/` (internal, stable). User profile lives in a single-row Notion DB with typed properties + prose body (user-changeable).
+- **`run_log` retired.** Legacy `run_log` DB is dropped. In-flight workflow state lives in SQLite checkpoint. The approved week plan is persisted by step-2 as a `Plan` property on the `training_week_summaries` row (see [step-2 spec update](#step-2-spec-update-delta-analysis-source)) and read back by step-1 for delta analysis.
 
-### Workflow
+## Data Contracts Across Sub-Steps
 
-```mermaid
-graph TD
-    A["Entry"] --> B["Query Sessions\n(Notion Tool)"]
-    B --> C{"HITL:\nVerify Sessions"}
-    C -->|"user confirms"| D["Extract Data\n(Tier-0 Parser)"]
-    D --> E{"HITL:\nVerify Extraction"}
-    E -->|"user confirms"| F["Generate Summary\n(Tier-2 Agent)"]
-    F --> G["Write Summary\n(Notion Tool)"]
-    G --> H["Update PLAN_STATE\n(Incremental/Bootstrap)"]
-    H --> I["Complete"]
+```
+1a (prompts loaded, CLI, DB IDs)
+   └─ produces: settings, prompts.loader, UserProfile loader, CLI entry
+1b (pure Python)
+   └─ consumes: session payloads (Notion query results), run_log-equivalent (Plan property)
+   └─ produces: WeekSummary Pydantic models (with ImplicitFeedback + PlanAdherence pre-filled)
+1c (LLM synthesis)
+   └─ consumes: 1a loaders + 1b models
+   └─ produces: completed WeekSummary with LLM-filled fields (wins, issues, recs, highlights, trend)
+1d (persistence)
+   └─ consumes: 1c output
+   └─ produces: Notion page in training_week_summaries, updated/bootstrapped PLAN_STATE
 ```
 
-Plain function with two HITL checkpoints:
+## Step-2 Spec Update — Delta-Analysis Source
 
-```python
-def run_extraction(week_target: int, checkpoint: CheckpointStore, thread_id: str):
-    # 1. Query sessions (Tier-0, Notion tools)
-    sessions = notion.query(db_id, filters_for_week(week_target))
-    
-    # 2. HITL: verify sessions
-    decision = hitl_verify(sessions, checkpoint, thread_id, ...)
-    if not decision.approved:
-        return  # checkpointed, user quit
-    
-    # 3. Extract data (Tier-0, Python parser)
-    extracted = parse_sessions(sessions)
-    
-    # 4. HITL: verify extraction
-    decision = hitl_verify(extracted, checkpoint, thread_id, ...)
-    if not decision.approved:
-        return
-    
-    # 5. Generate summary (Tier-2, Pydantic AI agent)
-    result = summarize_agent.run_sync(user_prompt=format_extraction(extracted))
-    run_cost.add(result)
-    
-    # 6. Write summary (Tier-0, Notion tools)
-    notion.create(summary_db_id, ..., result.data.summary_markdown)
-    
-    # 7. Update PLAN_STATE
-    update_plan_state(week_target, result.data)
-    
-    checkpoint.delete(thread_id)
-```
+Step-2 currently persists approved plan only in checkpoint. To enable step-1 delta analysis, step-2 must also write the plan to Notion at approval time:
 
-### Edge Conditions
+- At plan approval: create (or update) a row in `training_week_summaries` with `Week=W##` and `Plan=<markdown>` property. `Summary` property remains empty until step-1 runs.
+- `training_week_summaries` DB needs a `Plan` rich_text property alongside the existing `Week` (text) and whatever property holds the summary body.
+- Acceptance: after `weekforge plan` approval, the W## row exists with a non-empty `Plan` property.
 
-| From | To | Condition |
-|------|-----|-----------|
-| Entry | Query Sessions | Always — fetch all sessions for the target week |
-| Query Sessions | HITL Verify Sessions | Sessions found — confirm correct set before extraction |
-| HITL Verify Sessions | Extract Data | User confirms |
-| Extract Data | HITL Verify Extraction | Data completeness check displayed |
-| HITL Verify Extraction | Generate Summary | User confirms extraction is complete |
-| Generate Summary | Write Summary | Summary generated (Tier-2 agent) |
-| Write Summary | Update PLAN_STATE | Summary written to Notion |
-| Update PLAN_STATE | Complete | PLAN_STATE updated |
-
-### PLAN_STATE
-
-The system's long-range memory — a cumulative mesocycle tracker persisted in Notion across the entire 8-12 week training block. It bridges Lifecycle B (writes it) and Lifecycle A (reads it).
-
-**Contents:** Progression chains for all main lifts (week-over-week weight tracking), injury timeline, adherence trends, deload history, focus exercise coverage gaps, cardio/climbing progression, push/pull balance, session preferences, active vs resolved issues.
-
-**Two creation modes:**
-- **Incremental update** — Merge new week's data into existing PLAN_STATE. Each category updated independently.
-- **Bootstrap** — If PLAN_STATE doesn't exist, compile from all available weekly summaries in chronological order. Self-healing.
-
-**Storage:** Lives in the `training_week_summaries` Notion database with `Week = "PLAN_STATE"` key.
-
-**Graceful degradation:** If missing when Lifecycle A runs, fall back to 3-week feedback window only. CLI surfaces a warning.
-
-### Data Extraction (Tier-0)
-
-Session data extraction is pure Python (Tier-0):
-- Parse Notion `to_do` blocks — extract exercise names, sets/reps/weight, checked state
-- Parse comments — extract freeform feedback
-- Parse properties — extract session metadata (date, type, duration)
-- Week prefix formatting: always zero-padded (`f"W{week_target:02d}"`), computed by tool function
-
-### Failure Handling
-
-- **Query returns 0 sessions:** Week prefix is Tier-0 computed (no format mismatch). If genuinely no sessions, surface to user at HITL.
-- **Partial data:** Load what's available, note gaps in extraction display.
-- **PLAN_STATE missing for bootstrap:** Compile from all available summaries. If no summaries exist either, create initial empty PLAN_STATE.
-- **Notion write failure:** Retry with backoff. Checkpoint preserves state so user can retry without re-generating.
-
-## Acceptance Criteria
-
-- [ ] `weekforge summarize` starts the extraction workflow
-- [ ] Sessions queried from Notion for the target week
-- [ ] HITL: user verifies correct sessions before extraction
-- [ ] Tier-0 parser extracts structured data from Notion blocks
-- [ ] HITL: user verifies extraction completeness
-- [ ] Tier-2 agent generates weekly summary with feedback (structured `result_type`)
-- [ ] Summary written to Notion
-- [ ] PLAN_STATE updated (incremental) or created (bootstrap)
-- [ ] Checkpoint persistence works across terminal sessions
-- [ ] Run cost displayed at completion
+This update will be folded into [step-2-planning.md](./step-2-planning.md) as part of the same revision cycle (see decision log DEC-006).
 
 ## Reference
 
 - [Patterns](../reference/patterns.md) — Parallelization (concurrent context loading)
 - [State Schema](../reference/state-schema.md) — Layer B context state
 - [Failure Modes](../reference/failure-modes.md) — Data & context failures, Notion API failures
+- [Prompt Style](../reference/prompt-style.md) — Caveman-lite directive
+- `source-material/.claude/commands/summarize_week.md` — Legacy authoritative behavior
+- `source-material/Claude.md` — Coaching persona
+- `source-material/.claude/rules/coaching-guardrails.md` — Safety constraints
+- `source-material/.claude/shared/user-profile.md` — User profile seed content
