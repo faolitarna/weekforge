@@ -1,27 +1,42 @@
-# Step 1b: Tier-0 Extraction (Pure Python)
+# Step 1b: Raw Session Collection (Thin Tier-0)
 
 ## Goal
 
-Build the deterministic extraction layer: parse Notion session payloads into structured exercise data, classify roles, compute checkbox analysis, compute delta vs. approved plan. Produce a `WeekSummary` Pydantic model with every machine-computable field pre-filled. Zero LLM calls.
+Build the thin data-collection layer: fetch Notion session pages, collect all block children
+and page comments into a structured `RawWeekData` bundle, and compute checkbox arithmetic.
+Zero semantic parsing. Zero LLM calls.
 
-This sub-step owns the faithful Python port of `<exercise-extraction>`, `<checkbox-analysis>`, and `<delta-analysis>` from `source-material/.claude/commands/summarize_week.md`.
+Tier-0 deliberately does NOT parse exercise params, classify roles, interpret comments, or
+perform delta analysis — all semantic work belongs to Tier-2 (step-1c LLM agent).
 
 ## Prerequisites
 
 Step 1a complete (settings, loaders, CLI stub).
 
+## Rationale
+
+Session types vary widely (gym, climbing, hiking, trail run) with fundamentally different
+block structures. Comment content is unstructured user free-text. The original
+`source-material` approach — LLM reads raw blocks directly — worked well. Tier-0 only owns
+what is genuinely deterministic: fetching blocks and counting booleans.
+
+See `.planning/notes/tier0-thin-extraction.md` for full decision rationale.
+
 ## What You're Building
 
 | File | Action | Purpose |
 |------|--------|---------|
-| `src/weekforge/models/week_summary.py` | NEW | Pydantic models for the weekly summary output |
-| `src/weekforge/tools/extraction.py` | NEW | Pure-Python parsing, classification, analysis |
-| `src/weekforge/tools/focus_exercises.py` | NEW | Constant list of the 10 Focus Exercises + matchers |
-| `tests/tools/test_extraction.py` | NEW | Unit tests against canned Notion payloads |
+| `src/weekforge/models/week_summary.py` | NEW | Pydantic output schema — contract for step-1c LLM to fill |
+| `src/weekforge/models/raw_week_data.py` | NEW | `RawSession` + `RawWeekData` dataclasses for the collection bundle |
+| `src/weekforge/tools/raw_session_collector.py` | NEW | Block/comment collection + checkbox arithmetic |
+| `tests/tools/test_raw_collector.py` | NEW | Unit tests for checkbox math only |
 
 ## Specification
 
-### Pydantic models (`models/week_summary.py`)
+### Output schema (`models/week_summary.py`)
+
+Define Pydantic models — these are the **contract** that step-1c fills. Tier-0 does not
+populate them directly (except `implicit_feedback`, which is checkbox math).
 
 ```python
 from typing import Literal
@@ -32,35 +47,35 @@ Status = Literal["done", "done_modified", "skip"]
 
 class ExerciseLogEntry(BaseModel):
     name: str
-    planned_weight: str | None          # e.g., "15kg" or "BW" — stringly-typed to preserve legacy format
+    planned_weight: str | None
     planned_sets: int | None
-    planned_reps: str | None            # "8" or "3x8" or "20sec" — freeform unit
-    actual_weight: str | None = None    # set when comment diverges from plan
+    planned_reps: str | None
+    actual_weight: str | None = None
     actual_sets: int | None = None
     actual_reps: str | None = None
     role: Role
     status: Status
-    feedback: str | None = None         # freeform comment excerpt if any
-    section: str | None = None          # raw section heading for traceability
+    feedback: str | None = None
+    section: str | None = None
 
 class SessionLine(BaseModel):
-    name: str                           # e.g., "W07: Hinge + Core"
+    name: str
     status: Literal["done", "skip", "partial"]
     exercises_done: int
     exercises_total: int
-    pain_status: str | None             # "ok", "SI flare", etc.
-    comment: str                        # 1-liner brief
+    pain_status: str | None
+    comment: str
 
 class CardioEntry(BaseModel):
     kind: Literal["z1_run", "z2_run", "z3_tempo", "hike", "trail_run", "other"]
-    raw: str                            # pre-rendered legacy-format line (Tier-0 emits verbatim)
+    raw: str
 
 class ClimbingEntry(BaseModel):
-    kind: str                           # "bouldering", "sport", etc.
+    kind: str
     raw: str
 
 class PainStatus(BaseModel):
-    si_joint: str | None                # "{status}|{triggers}|{what_helped}"
+    si_joint: str | None
     other: str | None
 
 class SectionRates(BaseModel):
@@ -70,161 +85,132 @@ class SectionRates(BaseModel):
 
 class SkippedPattern(BaseModel):
     exercise: str
-    skip_rate: float                    # 0.0–1.0
+    skip_rate: float
 
 class ImplicitFeedback(BaseModel):
     total_checked: int
     total_exercises: int
-    per_session: list[tuple[str, int, int]]     # (session_name, checked, total)
+    per_session: list[tuple[str, int, int]]
     section_rates: SectionRates
-    frequently_skipped: list[SkippedPattern]    # >50% skip rate
-    always_completed: list[str]                 # 100% completion
+    frequently_skipped: list[SkippedPattern]
+    always_completed: list[str]
 
 class PlanAdherence(BaseModel):
     planned_total: int
     completed: int
     modified: int
     skipped: int
-    modification_patterns: list[tuple[str, str, str]]   # (original, replacement, reason)
-    skip_patterns: list[tuple[str, str]]                # (session_type, reason)
+    modification_patterns: list[tuple[str, str, str]]
+    skip_patterns: list[tuple[str, str]]
 
 class WeekSummary(BaseModel):
-    week_prefix: str                    # "W07"
-    completion: str                     # "{done}/{total}"
-    context: str | None = None          # external factors (illness, travel)
+    week_prefix: str
+    completion: str
+    context: str | None = None
     sessions: list[SessionLine]
     exercise_log: list[ExerciseLogEntry]
     cardio_log: list[CardioEntry] = Field(default_factory=list)
     climbing_log: list[ClimbingEntry] = Field(default_factory=list)
     pain_status: PainStatus
-    issues: list[str] = Field(default_factory=list)           # LLM-filled
-    wins: list[str] = Field(default_factory=list)             # LLM-filled
-    recommendations_next: list[str] = Field(default_factory=list)  # LLM-filled
+    issues: list[str] = Field(default_factory=list)
+    wins: list[str] = Field(default_factory=list)
+    recommendations_next: list[str] = Field(default_factory=list)
     plan_adherence: PlanAdherence | None = None
     implicit_feedback: ImplicitFeedback
-    # LLM-filled surface fields for the HITL accept panel
     highlights: list[str] = Field(default_factory=list)
     trend: str = ""
 ```
 
-Tier-0 1b fills: `week_prefix`, `completion`, `sessions`, `exercise_log`, `cardio_log`, `climbing_log`, `pain_status` (structural), `implicit_feedback`, `plan_adherence`. Tier-2 (1c) fills: `context`, `issues`, `wins`, `recommendations_next`, `highlights`, `trend`, and narrative embellishment of `pain_status`.
+Tier-0 fills: `implicit_feedback` (checkbox arithmetic only).
+Tier-2 (step-1c) fills: everything else.
 
-### Focus exercises (`tools/focus_exercises.py`)
+### Collection bundle (`models/raw_week_data.py`)
 
 ```python
-FOCUS_EXERCISES: frozenset[str] = frozenset({
-    "bar hang", "bar hangs",
-    "side plank",
-    "reverse lunge", "multidirectional lunge",
-    "bicep curl",
-    "elevator press",
-    "single arm ohp", "single-arm ohp",
-    "carry", "carries",
-    "x-press lat walk",
-    "face pull", "face pulls",
-    "pull-up", "pull up", "pullup",
-})
+from dataclasses import dataclass, field
 
-def is_focus_exercise(name: str) -> bool:
-    """Case-insensitive substring match against known focus exercises."""
-    normalized = name.lower().strip()
-    return any(fx in normalized for fx in FOCUS_EXERCISES)
+@dataclass
+class RawBlock:
+    block_type: str          # "to_do", "heading_2", "heading_3", "paragraph", etc.
+    text: str                # concatenated plain text from rich_text array
+    checked: bool | None     # only set for to_do blocks
+    raw: dict                # original Notion block dict (for any downstream access)
+
+@dataclass
+class RawSession:
+    page_id: str
+    name: str
+    blocks: list[RawBlock]
+    comments: list[str]      # plain text of each Notion comment on the page
+
+@dataclass
+class RawWeekData:
+    week_prefix: str
+    sessions: list[RawSession]
+    planned_plan_markdown: str | None   # from run_log, None if no plan persisted
 ```
 
-### Extraction (`tools/extraction.py`)
-
-Core functions — all pure Python, no LLM:
+### Collector (`tools/raw_session_collector.py`)
 
 ```python
-def parse_sessions(notion_session_pages: list[dict]) -> list[ParsedSession]:
-    """For each session page: extract properties, walk block children, parse to_do blocks,
-    attach comments. Returns a ParsedSession dataclass per page."""
+def collect_blocks(page_id: str, notion_client) -> list[RawBlock]:
+    """Fetch block children for a page. Flatten rich_text to plain string.
+    Access all fields via .get() — never assume key exists."""
 
-def parse_to_do_block(block: dict, current_section: str | None) -> ParsedToDo:
-    """Extract name, planned params (weight/sets/reps), checked state, section from a to_do."""
+def collect_comments(page_id: str, notion_client) -> list[str]:
+    """Fetch page comments. Return list of plain-text comment bodies."""
 
-def classify_role(exercise_name: str, section: str | None) -> Role:
-    """main | accessory | focus | warmup | cooldown.
-    Priority: focus (if is_focus_exercise) > section-based (warmup/cooldown) > main/accessory heuristic."""
+def collect_raw_sessions(
+    session_pages: list[dict],
+    notion_client,
+) -> list[RawSession]:
+    """For each session page: collect blocks + comments. Return RawSession per page.
+    Raise ValueError if session_pages is empty."""
 
-def reconcile_exercise(todo: ParsedToDo, comments: list[str]) -> ExerciseLogEntry:
-    """Extract actual params from freeform comments (regex + keyword passes for
-    'did Xkg', 'only managed', 'swapped X for Y', etc.). Produces planned→actual diff."""
+def compute_checkbox_analysis(sessions: list[RawSession]) -> ImplicitFeedback:
+    """Pure arithmetic over to_do block checked states.
+    - per_session: (name, checked_count, total_count) per session
+    - section_rates: track current_section from heading blocks; bucket to_do blocks
+    - frequently_skipped: exercise text where skip_count / appearances > 0.5
+    - always_completed: exercise text where skip_count == 0 across all appearances
+    No interpretation — counts only."""
 
-def build_session_line(parsed: ParsedSession, log: list[ExerciseLogEntry]) -> SessionLine:
-    """Per-session 1-liner: done/skip/partial, exercises_done/total, pain_status from comments."""
-
-def compute_checkbox_analysis(sessions: list[ParsedSession]) -> ImplicitFeedback:
-    """Pure arithmetic over to_do checked states. No interpretation."""
-
-def compute_delta_analysis(
-    sessions: list[ParsedSession],
-    planned_plan_markdown: str | None,
-) -> PlanAdherence | None:
-    """Match actual sessions to planned sessions by focus-keyword overlap.
-    Returns None if planned_plan_markdown is None (no plan persisted — legacy 'n/a' path)."""
-
-def assemble_tier0_summary(
+def assemble_raw_week(
     week_prefix: str,
-    sessions: list[ParsedSession],
+    session_pages: list[dict],
+    notion_client,
     planned_plan_markdown: str | None,
-) -> WeekSummary:
-    """Top-level entry. Wires everything into a partial WeekSummary with Tier-0 fields filled.
-    LLM-filled fields left as defaults."""
+) -> RawWeekData:
+    """Top-level entry. Calls collect_raw_sessions, returns RawWeekData bundle.
+    Raise ValueError(f'{week_prefix}: no sessions found') when empty."""
 ```
 
-### Parsing rules (from `summarize_week.md`)
+### Unit tests (`tests/tools/test_raw_collector.py`)
 
-- **Section tracking:** iterate block children; `heading_2` / `heading_3` update `current_section`. Subsequent `to_do` blocks inherit that section.
-- **Param parsing:** `to_do` rich_text content. Extract name (before ` - ` or before `(`). Extract params from parentheses (e.g., `(15kg x 3x8)`), using regex. Unknown → `None`.
-- **Checked state:** `block["to_do"]["checked"]` — boolean.
-- **Role classification priority:**
-  1. `is_focus_exercise(name)` → `focus` (overrides section).
-  2. section name contains `"warm"` (case-insensitive) → `warmup`.
-  3. section name contains `"cool"` → `cooldown`.
-  4. Compound heuristic (squat/deadlift/press/row/pull-up keywords in name) → `main`.
-  5. else → `accessory`.
-- **Comment parsing (Tier-0 heuristics):** regex for `did (\d+)kg`, `only managed (\d+x\d+)`, `swapped (.+?) for (.+)`, `bumped (?:weight|to) (\d+)kg`, etc. Best-effort — any comment content that does not match regex flows through to `feedback` freeform and is later interpreted by the LLM.
-- **Pain heuristics:** keyword scan for `SI`, `pain`, `flare`, `ache`, `sore` → `pain_status.si_joint` or `.other`. LLM in step 1c enriches with narrative.
-- **Checkbox analysis:**
-  - `per_session`: list of `(session_name, checked, total)`.
-  - `section_rates`: `checked / total` per section bucket, percentage 0–100.
-  - `frequently_skipped`: exercises where `skipped_count / appearances > 0.5`.
-  - `always_completed`: exercises with `skipped_count == 0` across all appearances.
-- **Delta analysis:**
-  - Parse `planned_plan_markdown` (numbered list, one session per line). Extract a keyword per line (longest token after removing week prefix).
-  - For each planned session, find actual session whose name contains the keyword (case-insensitive).
-  - Match → `completed` if all `to_do` checked else `modified`; no match → `skipped`.
-  - Build `modification_patterns` from comment swap-regexes, `skip_patterns` from unmatched sessions' freeform reasons.
+Use minimal inline fixtures (dicts), not file-based fixtures — simpler to maintain.
 
-### Unit tests (`tests/tools/test_extraction.py`)
-
-Cover the critical paths with canned Notion fixture payloads stored under `tests/fixtures/notion/`:
-
-- `test_parse_to_do_weight_sets_reps` — typical `Goblet Squat (15kg x 3x8)` parses correctly.
-- `test_parse_to_do_bodyweight` — `Bar Hangs (BW x 3x20sec)` → `weight="BW"`, `reps="20sec"`.
-- `test_classify_role_focus_overrides_section` — face pulls in warmup → `focus`, not `warmup`.
-- `test_classify_role_warmup_section` — arbitrary mobility drill in `Warm-up` section → `warmup`.
-- `test_reconcile_actual_params` — comment `"bumped weight to 17kg"` → `actual_weight="17kg"`.
-- `test_compute_checkbox_analysis_rates` — canned session with mixed checks → correct section_rates and skipped_patterns.
-- `test_compute_delta_analysis_none_when_no_plan` — `planned_plan_markdown=None` → returns `None`.
-- `test_compute_delta_analysis_matches_by_keyword` — planned `Hinge + Core` matches actual `W07: Hinge + Core`.
-- `test_assemble_tier0_summary_zero_sessions_raises` — empty `sessions` list → `ValueError` (hard fail; see HITL decision in step-1c).
+- `test_collect_blocks_extracts_text` — to_do block with rich_text → `text` field populated
+- `test_collect_blocks_checked_state` — checked=True and checked=False both captured correctly
+- `test_compute_checkbox_analysis_counts` — 3 sessions with mixed checks → correct totals
+- `test_compute_checkbox_analysis_section_rates` — heading_2 sets section → to_do bucketed correctly
+- `test_compute_checkbox_analysis_frequently_skipped` — exercise unchecked 2/3 times → in frequently_skipped
+- `test_assemble_raw_week_empty_raises` — empty session_pages → ValueError with week_prefix
 
 ## Acceptance Criteria
 
-- [ ] All Pydantic models in `week_summary.py` validate round-trip (`model_dump_json()` / `model_validate_json()`).
-- [ ] `parse_sessions` produces one `ParsedSession` per Notion page, with all `to_do` blocks captured and sections correctly attributed.
-- [ ] `classify_role` returns the expected role for each fixture case (focus override, warmup/cooldown sections, compound-lift detection).
-- [ ] `reconcile_exercise` captures planned→actual divergence when comments include weight/reps changes or swaps.
-- [ ] `compute_checkbox_analysis` returns arithmetically correct `per_session` counts, `section_rates`, `frequently_skipped`, `always_completed` for the test fixtures.
-- [ ] `compute_delta_analysis` returns `None` when no plan markdown is provided, otherwise returns a populated `PlanAdherence`.
-- [ ] `assemble_tier0_summary` populates every Tier-0 field and leaves LLM-fill fields at defaults.
-- [ ] Zero-session case raises `ValueError` with a message containing the week prefix.
-- [ ] Unit test suite passes under `uv run pytest tests/tools/test_extraction.py`.
+- [ ] `WeekSummary` and all sub-models validate round-trip (`model_dump_json` / `model_validate_json`)
+- [ ] `collect_raw_sessions` returns one `RawSession` per page with all `to_do` + heading blocks captured
+- [ ] `compute_checkbox_analysis` returns arithmetically correct counts for all fixture cases
+- [ ] `assemble_raw_week` raises `ValueError` containing week prefix when session list is empty
+- [ ] All field access in collector uses `.get()` — no `KeyError` on malformed Notion responses
+- [ ] `uv run pytest tests/tools/test_raw_collector.py` passes
 
 ## Out of Scope
 
-- LLM synthesis (issues, wins, recommendations, highlights, trend) → step-1c
+- Exercise param parsing (sets/reps/weight) → step-1c LLM
+- Role classification → step-1c LLM (system prompt)
+- Comment interpretation → step-1c LLM
+- Delta analysis → step-1c LLM
+- Focus exercises constant → step-1c (embed in system prompt, not a Python module)
 - HITL, workflow orchestration → step-1c
 - Notion write, PLAN_STATE → step-1d
