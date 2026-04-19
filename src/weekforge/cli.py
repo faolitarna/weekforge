@@ -116,11 +116,12 @@ def plan() -> None:
 def summarize_week(week: int = typer.Argument(..., help="Week number, e.g. 7")) -> None:
     """Generate a weekly summary from completed training sessions."""
     from weekforge.tools.formatting import format_week_prefix
-    from weekforge.workflows.summarize_week import run_summarize_week
+    from weekforge.workflows.extraction import run_summarize
 
     store = _make_store()
-    tid = f"summarize-week-{format_week_prefix(week)}"
-    _run_or_pause(tid, lambda: run_summarize_week(week, store))
+    week_prefix = format_week_prefix(week)
+    tid = f"summarize-week-{week_prefix}"
+    _run_or_pause(tid, lambda: run_summarize(week_prefix, tid, store))
 
 
 @app.command()
@@ -139,6 +140,12 @@ def resume(
         from weekforge.workflows.e2e import run_e2e
 
         _run_or_pause(thread_id, lambda: run_e2e(database_id=None, thread_id=thread_id, store=store))
+        return
+
+    if rec.workflow == "extraction":
+        from weekforge.workflows.extraction import run_summarize
+
+        _run_or_pause(thread_id, lambda: run_summarize("", thread_id, store))
         return
 
     console.print(f"[red]Unknown workflow: {rec.workflow}[/red]")
