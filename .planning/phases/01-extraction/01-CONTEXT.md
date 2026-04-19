@@ -5,6 +5,8 @@
 - **Extraction Pipeline Control Flow**: Synchronous Loop
   - Rationale: Simpler to implement. We will test the actual delay in reality before optimizing.
   - Details: Implement a progress bar in the CLI during the synchronous fetch.
+- **Pydantic AI Output Format**: Loose Strings
+  - Rationale: The legacy outputs are highly creative and variable (as shown by past summary data). Wrapping everything in strict enums would be too rigid. Let the LLM output free text for maximum flexibility.
 
 ## Deferred Ideas
 
