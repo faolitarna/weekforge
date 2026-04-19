@@ -30,7 +30,7 @@ Intelligent, reliable, and flow-compatible training week management that operate
 ### Out of Scope
 
 - [Direct Data Mutation by LLMs] — Agents never touch Notion directly; strict Tier-0 tools mediate to prevent data corruption.
-- [Heavy Workflow Frameworks] — Migrated away from LangGraph; plain Python `while` loops suffice and reduce dependency weight.
+- [Heavy Workflow Frameworks] — Migrated away from LangGraph to Pydantic AI; plain Python `while` loops suffice for orchestration, and Pydantic AI handles structured LLM generation natively.
 
 ## Context
 
