@@ -7,6 +7,8 @@
   - Details: Implement a progress bar in the CLI during the synchronous fetch.
 - **Pydantic AI Output Format**: Loose Strings
   - Rationale: The legacy outputs are highly creative and variable (as shown by past summary data). Wrapping everything in strict enums would be too rigid. Let the LLM output free text for maximum flexibility.
+- **HITL Feedback UI**: Just highlights
+  - Rationale: Follows communication rules from szymi-blueprint to prevent terminal flooding. Details are hidden until the final write to Notion.
 
 ## Deferred Ideas
 
