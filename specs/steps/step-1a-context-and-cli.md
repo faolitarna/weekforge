@@ -12,7 +12,7 @@
 
 ## Goal
 
-Prepare the config and loader surface that every subsequent sub-step depends on: coaching prompts bundled with the package, user profile fetchable from Notion, `.env` wired with all training DB IDs, and `weekforge summarize <week>` CLI entry with week-prefix formatting and existing-summary overwrite check.
+Prepare the config and loader surface that every subsequent sub-step depends on: coaching prompts bundled with the package, user profile fetchable from Notion, `.env` wired with all training DB IDs, and `weekforge summarize-week <week>` CLI entry with week-prefix formatting and existing-summary overwrite check.
 
 Zero LLM calls. Pure plumbing.
 
@@ -27,14 +27,14 @@ Step 0d complete.
 | `src/weekforge/prompts/__init__.py` | NEW | Package marker so markdown files are importable resources |
 | `src/weekforge/prompts/coaching_persona.md` | NEW | Verbatim copy of `source-material/Claude.md` |
 | `src/weekforge/prompts/coaching_guardrails.md` | NEW | Verbatim copy of `source-material/.claude/rules/coaching-guardrails.md` |
-| `src/weekforge/prompts/loader.py` | NEW | `load_coaching_persona()`, `load_coaching_guardrails()` — `@lru_cache`, uses `importlib.resources` |
+| `src/weekforge/prompts/loader.py` | NEW | `load_prompt(Prompt.X)` — `StrEnum` + `functools.cache`, uses `importlib.resources` (see Implementation Status) |
 | [pyproject.toml](../../pyproject.toml) | UPDATE | Ensure `*.md` under `weekforge.prompts` is packaged |
 | [src/weekforge/config/env.py](../../src/weekforge/config/env.py) | UPDATE | Add four training DB ID settings |
 | [.env.template](../../.env.template) | UPDATE | Add four training DB ID vars with comments |
 | `src/weekforge/models/user_profile.py` | NEW | Pydantic `UserProfile` model (`page_id` + `markdown`) |
 | `src/weekforge/config/user_profile_loader.py` | NEW | `load_user_profile() -> UserProfile` — fetch page blocks, convert to markdown |
 | `src/weekforge/tools/formatting.py` | NEW | `format_week_prefix(week: int) -> str` — zero-pad, `"W{week:02d}"`. Landed at `tools/formatting.py` (shared formatting module) rather than a dedicated `week_prefix.py`. |
-| [src/weekforge/cli.py](../../src/weekforge/cli.py) | UPDATE | Add `summarize <week>` command, stub target for 1c workflow |
+| [src/weekforge/cli.py](../../src/weekforge/cli.py) | UPDATE | Add `summarize-week <week>` command, stub target for 1c workflow |
 
 ## Specification
 
@@ -43,11 +43,18 @@ Step 0d complete.
 - `coaching_persona.md` = byte-for-byte copy of `source-material/Claude.md`. Source file stays in repo as historical reference; the copy in `src/weekforge/prompts/` is the live one consumed at runtime.
 - `coaching_guardrails.md` = byte-for-byte copy of `source-material/.claude/rules/coaching-guardrails.md`.
 - Loader uses `importlib.resources.files("weekforge.prompts").joinpath(<name>).read_text(encoding="utf-8")` and wraps with `@functools.lru_cache(maxsize=1)`.
-- Loader API:
+- Loader API (as shipped — deviation from original draft): single polymorphic entry point with `StrEnum` + `@functools.cache`:
   ```python
-  def load_coaching_persona() -> str: ...
-  def load_coaching_guardrails() -> str: ...
+  from enum import StrEnum
+
+  class Prompt(StrEnum):
+      COACHING_PERSONA = "coaching_persona.md"
+      COACHING_GUARDRAILS = "coaching_guardrails.md"
+
+  @functools.cache
+  def load_prompt(prompt: Prompt) -> str: ...
   ```
+  Original draft had named functions (`load_coaching_persona()`, `load_coaching_guardrails()`). Replaced with polymorphic `load_prompt(Prompt.X)` so new prompts don't need a new function per file. All call sites (including step-1c `prompt_composer`) use the new API.
 - Sync copies of source-material files are checked at commit time by a lightweight test: `tests/prompts/test_prompts_sync.py` asserts file contents match `source-material/…`. Keeps drift visible.
 
 ### Packaging
@@ -152,19 +159,21 @@ def format_week_prefix(week: int) -> str:
 
 Pure function. Unit-tested standalone.
 
-### CLI: `weekforge summarize <week>`
+### CLI: `weekforge summarize-week <week>`
 
 Extend [cli.py](../../src/weekforge/cli.py):
 
 ```python
-@app.command()
-def summarize(week: int = typer.Argument(..., help="Week number, e.g. 7")) -> None:
+@app.command("summarize-week")
+def summarize_week(week: int = typer.Argument(..., help="Week number, e.g. 7")) -> None:
     """Generate a weekly summary from completed training sessions."""
     week_prefix = format_week_prefix(week)
     thread_id = f"summarize-{week_prefix}"
     store = CheckpointStore(...)
     run_summarize(week_prefix, thread_id, store)  # stub target for step-1c
 ```
+
+Command name hyphenated (`summarize-week`) for consistency with Typer conventions and to disambiguate from the future `summarize-plan` terminal-review command (step-4).
 
 Typer's positional `int` argument fails fast if missing or non-integer — no custom validation needed. Error output: standard Typer error panel.
 
@@ -178,6 +187,8 @@ Before the workflow proper begins (spec lives in step-1c, but the CLI prologue h
 
 Implementation of the `run_summarize` stub in 1a: perform the overwrite check, load prompts + user profile, print a "context ready" summary panel (Rich), then raise `NotImplementedError("Workflow body lands in step-1c")`. This proves the loader + CLI wiring end-to-end without blocking on 1b/1c.
 
+**Status note:** As shipped, 1a's `run_summarize` stub was superseded by step-1c before the overwrite-check prompt was wired. Workflow currently pass-throughs `overwrite_check` → `load_context` without querying (see [workflows/extraction.py](../../src/weekforge/workflows/extraction.py) — the `overwrite_check` branch is a placeholder). Still open.
+
 ## Acceptance Criteria
 
 - [x] `src/weekforge/prompts/coaching_persona.md` matches `source-material/Claude.md` byte-for-byte.
@@ -190,7 +201,7 @@ Implementation of the `run_summarize` stub in 1a: perform the overwrite check, l
 - [x] `load_user_profile()` fetches a real Notion page and returns `UserProfile` with markdown content.
 - [x] `load_user_profile()` raises `ConfigError` when page content is empty.
 - [x] `format_week_prefix(7) == "W07"`, `format_week_prefix(12) == "W12"`, invalid input raises `ValueError`.
-- [x] `uv run weekforge summarize-week 7` runs, triggers overwrite prompt when a W07 summary exists, loads persona + guardrails + user profile, prints a "context ready" panel, and exits with `NotImplementedError` (stub behavior).
+- [x] `uv run weekforge summarize-week 7` runs the full workflow (the stub was superseded by step-1c). Overwrite prompt: **not yet wired** (`overwrite_check` is a pass-through — open follow-up).
 - [x] `uv run weekforge summarize-week` without arg fails with a clear Typer error.
 - [x] Tests: `tests/prompts/test_prompts_sync.py`, `tests/tools/test_formatting.py`, `tests/config/test_user_profile_loader.py`, `tests/tools/test_notion_markdown_converter.py`.
 

@@ -1,5 +1,13 @@
 # Step 1b: Raw Session Collection (Thin Tier-0)
 
+## Implementation Status
+
+✅ **Done.** Models, collectors, and checkbox arithmetic land in `src/weekforge/models/week_summary.py`, `src/weekforge/models/raw_week_data.py`, and `src/weekforge/tools/raw_session_collector.py`. Tests at `tests/tools/test_raw_collector.py`.
+
+**Deviations from draft:**
+- `ImplicitFeedback.per_session` is `list[SessionCheckCount]` (Pydantic model with `name`/`checked`/`total`), not `list[tuple[str, int, int]]`. Named fields survive schema evolution; tuples don't.
+- `PlanAdherence.modification_patterns` is `list[ModificationPattern]` (`exercise`/`planned`/`actual`); `PlanAdherence.skip_patterns` is `list[SkipPattern]` (`exercise`/`reason`). Same reasoning.
+
 ## Goal
 
 Build the thin data-collection layer: fetch Notion session pages, collect all block children
@@ -87,10 +95,24 @@ class SkippedPattern(BaseModel):
     exercise: str
     skip_rate: float
 
+class SessionCheckCount(BaseModel):
+    name: str
+    checked: int
+    total: int
+
+class ModificationPattern(BaseModel):
+    exercise: str
+    planned: str
+    actual: str
+
+class SkipPattern(BaseModel):
+    exercise: str
+    reason: str
+
 class ImplicitFeedback(BaseModel):
     total_checked: int
     total_exercises: int
-    per_session: list[tuple[str, int, int]]
+    per_session: list[SessionCheckCount]
     section_rates: SectionRates
     frequently_skipped: list[SkippedPattern]
     always_completed: list[str]
@@ -100,8 +122,8 @@ class PlanAdherence(BaseModel):
     completed: int
     modified: int
     skipped: int
-    modification_patterns: list[tuple[str, str, str]]
-    skip_patterns: list[tuple[str, str]]
+    modification_patterns: list[ModificationPattern]
+    skip_patterns: list[SkipPattern]
 
 class WeekSummary(BaseModel):
     week_prefix: str
@@ -198,12 +220,12 @@ Use minimal inline fixtures (dicts), not file-based fixtures — simpler to main
 
 ## Acceptance Criteria
 
-- [ ] `WeekSummary` and all sub-models validate round-trip (`model_dump_json` / `model_validate_json`)
-- [ ] `collect_raw_sessions` returns one `RawSession` per page with all `to_do` + heading blocks captured
-- [ ] `compute_checkbox_analysis` returns arithmetically correct counts for all fixture cases
-- [ ] `assemble_raw_week` raises `ValueError` containing week prefix when session list is empty
-- [ ] All field access in collector uses `.get()` — no `KeyError` on malformed Notion responses
-- [ ] `uv run pytest tests/tools/test_raw_collector.py` passes
+- [x] `WeekSummary` and all sub-models validate round-trip (`model_dump_json` / `model_validate_json`)
+- [x] `collect_raw_sessions` returns one `RawSession` per page with all `to_do` + heading blocks captured
+- [x] `compute_checkbox_analysis` returns arithmetically correct counts for all fixture cases
+- [x] `assemble_raw_week` raises `ValueError` containing week prefix when session list is empty
+- [x] All field access in collector uses `.get()` — no `KeyError` on malformed Notion responses
+- [x] `uv run pytest tests/tools/test_raw_collector.py` passes
 
 ## Out of Scope
 

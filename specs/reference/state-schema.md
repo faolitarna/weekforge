@@ -60,3 +60,24 @@ Grows as the workflow progresses. Stored on the Pydantic state model as plain fi
 - **Avoid state bloat:** Full session markdown lives only in `current_draft` (ephemeral local variable). On approval, written to Notion and replaced with a lightweight reference.
 - **Workflow-scoped models:** Each workflow defines its own state model with only the fields it needs. No monolithic shared state class.
 - **Context is disposable:** Layer B fields are loaded fresh every time they're needed. Stale context is never reused from a previous checkpoint.
+
+## Extraction workflow — `ExtractionState` (step-1)
+
+The Layer A/B/C schema above was written for the planning workflow. The extraction workflow (`summarize-week`) uses a separate Pydantic model — [`ExtractionState`](../../src/weekforge/models/workflow_state.py) — with a different Layer-A shape:
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `week_prefix` | `str` | `"W##"` — which week is being summarized (replaces planning's `week_target: int`) |
+| `overwrite_confirmed` | `bool` | Reserved for the overwrite-check prompt (currently a pass-through — see step-1c Implementation Status) |
+| `user_profile_markdown` | `str \| None` | Layer-B context loaded at `load_context` step |
+| `raw_sessions_json` / `tier0_summary` | `str` / `WeekSummary \| None` | Tier-0 output bundle |
+| `last_output` | `WeekSummary \| None` | Latest agent output for the HITL accept gate |
+| `messages_json` | `list[dict]` | Pydantic-AI message history persisted across HITL pauses |
+| `calls` | `list[CallMetadata]` | Accumulated per-call cost/latency metadata |
+| `pending_feedback` | `str \| None` | User feedback replayed into the next agent run |
+| `step` | `str` | Step literal (`overwrite_check` → `load_context` → `tier0_extract` → `agent` → `accept` → `write` → `plan_state_check` → `plan_state_update` → `done`) |
+| `written_page_id` / `plan_state_page_id` | `str \| None` | Notion page IDs written during step-1d |
+| `is_bootstrap` | `bool` | Whether the PLAN_STATE path is incremental or bootstrap |
+| `plan_state_raw` | `str \| None` | Existing PLAN_STATE row text for the incremental merge |
+
+The planning-workflow schema above remains accurate for the `plan` lifecycle (step-2).

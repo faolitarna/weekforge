@@ -1,5 +1,16 @@
 # Step 1c: Summary Agent & Workflow
 
+## Implementation Status
+
+✅ **Done.** Agent, state model, workflow orchestrator, and CLI wiring land in commit `2a072b3`. Notion write + PLAN_STATE (step-1d) follow directly in the same `extraction.py` workflow.
+
+**Deviations / open follow-ups:**
+- `overwrite_check` step is a **pass-through placeholder** (`workflows/extraction.py:53-56`). The prompt described in 1a/1c Specification is not wired yet — fix before multi-week re-runs are safe.
+- Workflow state model (`ExtractionState`) gained extra fields owned by step-1d: `is_bootstrap`, `plan_state_raw`, `plan_state_page_id`, `written_page_id`, plus step literals `plan_state_check`, `plan_state_update`, `done`. Listed here so schema migrations stay traceable to a single source.
+- Test gaps (tracked, not blocking):
+  - `tests/agents/test_prompt_composer.py` covers only legacy `compose_system_prompt`, not the new `compose_static_instructions`.
+  - `tests/workflows/test_extraction.py::test_run_summarize_success` still asserts `NotImplementedError("step-1d")` — stale after 1d shipped; update to assert successful write through to `done`.
+
 ## Goal
 
 Add LLM synthesis on top of the Tier-0 extraction: define `summarize_agent` (Pydantic AI) with coaching persona + guardrails as static instructions and user profile + Tier-0 facts as dynamic instructions. Build the `extraction` workflow with a single HITL acceptance gate and feedback loop. Writes are stubbed — step-1d owns persistence.
@@ -33,8 +44,8 @@ def compose_static_instructions(caveman_mode: bool) -> str:
     Passed to Agent(instructions=...) — static, known at construction time,
     eligible for prompt-cache prefix."""
     sections = [
-        "## Coaching Persona\n\n" + load_coaching_persona(),
-        "## Safety Guardrails\n\n" + load_coaching_guardrails(),
+        "## Coaching Persona\n\n" + load_prompt(Prompt.COACHING_PERSONA),
+        "## Safety Guardrails\n\n" + load_prompt(Prompt.COACHING_GUARDRAILS),
     ]
     if caveman_mode:
         sections.append(CAVEMAN_LITE_DIRECTIVE)
@@ -163,8 +174,8 @@ Modelled after [e2e.py](../../src/weekforge/workflows/e2e.py) — same shape, fe
 Replace 1a's `NotImplementedError` stub:
 
 ```python
-@app.command()
-def summarize(week: int = typer.Argument(...)) -> None:
+@app.command("summarize-week")
+def summarize_week(week: int = typer.Argument(...)) -> None:
     week_prefix = format_week_prefix(week)
     thread_id = f"summarize-{week_prefix}"
     store = CheckpointStore(...)
@@ -178,7 +189,7 @@ Resume path: `weekforge resume --thread-id <id>` works automatically since `Extr
 - Notion query failure → Tenacity retry (existing behavior in [notion_api_gateway.py](../../src/weekforge/tools/notion_api_gateway.py)).
 - Zero sessions for week → `RuntimeError("No sessions found for {W##}")`, CLI prints a clear recovery hint pointing at the `Week` property.
 - Agent structured-output validation error → surfaces as Pydantic AI's standard validation exception; workflow checkpoints the last good state so user can re-run without losing prior messages.
-- Checkpoint missing on `weekforge resume` → clear error, suggest re-running `weekforge summarize <week>`.
+- Checkpoint missing on `weekforge resume` → clear error, suggest re-running `weekforge summarize-week <week>`.
 
 ### Tests
 
@@ -188,16 +199,16 @@ Resume path: `weekforge resume --thread-id <id>` works automatically since `Extr
 
 ## Acceptance Criteria
 
-- [ ] `compose_static_instructions(False)` concatenates persona + guardrails. `compose_static_instructions(True)` appends the caveman directive.
-- [ ] `summarize_agent` is constructed with `instructions=` (NOT `system_prompt=`), `deps_type=SummarizeDeps`, `output_type=WeekSummary`.
-- [ ] `@summarize_agent.instructions` decorators inject user profile and Tier-0 facts from `RunContext.deps`.
-- [ ] `ExtractionState` round-trips through JSON (checkpoint compatibility).
-- [ ] `run_summarize` executes overwrite_check → load_context → tier0_extract → agent → accept; each step persists before the next.
-- [ ] HITL accept panel displays `highlights` + `trend` prominently; feedback loop re-invokes agent with `message_history`; quit preserves state for `weekforge resume`.
-- [ ] Agent output passes validation (Pydantic `WeekSummary`) and does not alter Tier-0 fields.
-- [ ] Zero-session input raises a `RuntimeError` with the week prefix in the message.
-- [ ] `write` step is still a placeholder (`NotImplementedError("Implemented in step-1d")`) — 1c is done when accept emits an approved state ready for 1d.
-- [ ] Test suite passes: `uv run pytest tests/agents/ tests/workflows/test_extraction.py`.
+- [x] `compose_static_instructions(False)` concatenates persona + guardrails. `compose_static_instructions(True)` appends the caveman directive. (No direct test — follow-up.)
+- [x] `summarize_agent` is constructed with `instructions=` (NOT `system_prompt=`), `deps_type=SummarizeDeps`, `output_type=WeekSummary`.
+- [x] `@summarize_agent.instructions` decorators inject user profile and Tier-0 facts from `RunContext.deps`.
+- [x] `ExtractionState` round-trips through JSON (checkpoint compatibility).
+- [~] `run_summarize` executes overwrite_check → load_context → tier0_extract → agent → accept; each step persists before the next. (`overwrite_check` is a pass-through — see Implementation Status.)
+- [x] HITL accept panel displays `highlights` + `trend` prominently; feedback loop re-invokes agent with `message_history`; quit preserves state for `weekforge resume`.
+- [x] Agent output passes validation (Pydantic `WeekSummary`) and does not alter Tier-0 fields.
+- [x] Zero-session input raises a `RuntimeError` with the week prefix in the message.
+- [~] `write` step replaced with real implementation from step-1d (was a placeholder during 1c development).
+- [~] Test suite passes: `uv run pytest tests/agents/ tests/workflows/test_extraction.py`. **Note:** `test_run_summarize_success` asserts the old `NotImplementedError("step-1d")` stub and will fail until updated.
 
 ## Out of Scope
 

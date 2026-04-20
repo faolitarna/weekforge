@@ -14,10 +14,18 @@ Step 1 is split into four sub-steps so each can be implemented independently by 
 
 | # | Sub-Step | Focus | Status |
 |---|----------|-------|--------|
-| 1a | [Context & CLI](./step-1a-context-and-cli.md) | Prompts dir (persona, guardrails), `.env` DB IDs, user-profile Notion DB + loader, `weekforge summarize <week>` CLI | ⬜ |
-| 1b | [Tier-0 Extraction](./step-1b-tier0-extraction.md) | Pure-Python parsing of sessions, role classification, checkbox analysis, delta analysis. Pydantic `WeekSummary` models. | ⬜ |
-| 1c | [Summary Agent & Workflow](./step-1c-summary-agent.md) | `summarize_agent` (Pydantic AI), `extraction.py` workflow, single HITL acceptance gate with feedback loop | ⬜ |
-| 1d | [Notion Write & PLAN_STATE](./step-1d-notion-write-and-plan-state.md) | `WeekSummary` → legacy text renderer, Notion write, PLAN_STATE incremental/bootstrap | ⬜ |
+| 1a | [Context & CLI](./step-1a-context-and-cli.md) | Prompts dir (persona, guardrails), `.env` DB IDs, user-profile Notion page + loader, `weekforge summarize-week <week>` CLI | ✅ |
+| 1b | [Tier-0 Extraction](./step-1b-tier0-extraction.md) | Thin Tier-0: block/comment collection + checkbox arithmetic. Pydantic `WeekSummary` contract. | ✅ |
+| 1c | [Summary Agent & Workflow](./step-1c-summary-agent.md) | `summarize_agent` (Pydantic AI), `extraction.py` workflow, single HITL acceptance gate with feedback loop | ✅ |
+| 1d | [Notion Write & PLAN_STATE](./step-1d-notion-write-and-plan-state.md) | `WeekSummary` → legacy text renderer, Notion write, PLAN_STATE incremental/bootstrap | ✅ |
+
+## Implementation Status
+
+All four sub-steps shipped in commits `2a072b3` (1c), `0da0b93` (1d), `cdc551c` (Notion API hardening — see [DEC-008](../decision-log.md)).
+
+**Remaining follow-ups (not blockers, tracked at the spec level):**
+- `overwrite_check` workflow step is a no-op pass-through in [workflows/extraction.py](../../src/weekforge/workflows/extraction.py) — the prompt described in 1a/1c is not wired yet.
+- A few tests predate 1d and still assert the old `NotImplementedError("step-1d")` stub behavior; see 1c's Implementation Status for the list.
 
 ## Architectural Summary
 

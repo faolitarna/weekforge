@@ -79,9 +79,9 @@ All Notion interactions encapsulated in reusable Tier-0 tool layer. LLM never to
 |---------|----------|
 | `weekforge` | Show available commands + active checkpoint status |
 | `weekforge plan` | Start or resume planning lifecycle (Lifecycle A) |
-| `weekforge summarize` | Start or resume extraction lifecycle (Lifecycle B) |
+| `weekforge summarize-week <week>` | Start or resume extraction lifecycle (Lifecycle B) |
 | `weekforge resume` | Resume from last checkpoint (any lifecycle) |
-| `weekforge e2e` | **Transitional (Phase 0 only).** End-to-end validation workflow — removed when `summarize` lands in step 1. |
+| `weekforge e2e` | **Transitional (Phase 0 only).** End-to-end validation workflow — removed when `summarize-week` lands in step 1. |
 
 ### AuDHD-Informed Design Principles
 

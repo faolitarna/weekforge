@@ -1,5 +1,17 @@
 # Step 1d: Notion Write & PLAN_STATE
 
+## Implementation Status
+
+✅ **Done.** Renderer, PLAN_STATE agent, and workflow extension land in commit `0da0b93`. A follow-up commit `cdc551c` hardened Notion API integration — details in [DEC-008](../decision-log.md) and inline notes below.
+
+**Implementation notes / deviations from draft:**
+- **Notion 100-block batching.** Notion's `blocks.children.append` caps at 100 children per request. Both `write` and `plan_state_update` steps chunk the rendered block list into 100-item batches before calling `append`. Not documented in the draft — necessary for weeks with long exercise logs.
+- **Dynamic title-property discovery.** The title property is not guaranteed to be named `"Title"`. `_get_title_property_name(database_id)` in `workflows/extraction.py` probes both the public API schema (`properties[*].type == "title"`) and the internal data-source schema (`data_sources[0].schema[*].type == "title"`) before falling back to the string `"Title"`.
+- **Week filter value.** Notion stores the `Week` property as a plain numeric string (`"1"`), not `"W01"`. Workflow parses `int(state.week_prefix[1:])` and filters client-side against the rich_text `plain_text`; `filter_properties` in `data_sources.query` fails schema validation, so it was removed.
+- **`RunCost` summary panel.** On `done`, the workflow prints a Rich panel with total tokens, latency, call count, and cost (aggregated across both `summarize_agent` and `plan_state_agent`). Not in the draft; added for observability.
+- **PLAN_STATE page-id logging.** After a successful bootstrap write, the created page ID is logged so users can verify via the Notion UI.
+- **Fixture-equality test for renderer.** Not implemented — tests use substring assertions. Preferred follow-up.
+
 ## Goal
 
 Close the loop: render the approved `WeekSummary` back into the legacy text format, write it to the `training_week_summaries` Notion row (updating the row step-2 pre-created), and update the cumulative `PLAN_STATE` tracker (incremental merge or bootstrap). This is the only sub-step that mutates Notion persistently.
@@ -117,23 +129,23 @@ Step transitions persist before each LLM call (same pattern as `agent` step in 1
 - `test_render_omits_plan_adherence_when_none` — `plan_adherence=None` → section absent.
 - `test_plan_state_incremental_mechanical_updates` — new week merged; `weeks_completed` incremented, `avg_completion` recalculated, `weekly` chain appended.
 - `test_plan_state_bootstrap_skeleton_when_no_summaries` — returns an empty PlanState, no LLM call made.
-- `tests/workflows/test_extraction_end_to_end.py` — full path from `weekforge summarize 7` to both Notion writes (weekly row + PLAN_STATE row), using fake Notion + fake agent.
+- `tests/workflows/test_extraction_end_to_end.py` — full path from `weekforge summarize-week 7` to both Notion writes (weekly row + PLAN_STATE row), using fake Notion + fake agent.
 
 ## Acceptance Criteria
 
-- [ ] `render_week_summary` emits the exact legacy format: same section order, same delimiters, same role/status codes. Verified via fixture equality test.
-- [ ] `PLAN_ADHERENCE` section omitted when `summary.plan_adherence is None`.
-- [ ] `training_week_summaries` row for `W##` is updated (not duplicated) when step-2 pre-created it; otherwise created with a warning logged.
-- [ ] PLAN_STATE incremental merge: weight chain extended, `weeks_completed` incremented, LLM-reasoned fields (trend, issue lifecycle) updated.
-- [ ] PLAN_STATE bootstrap: compiles from all weekly summaries chronologically; empty skeleton when no summaries exist.
-- [ ] PLAN_STATE written to `training_week_summaries` with `Week="PLAN_STATE"`.
-- [ ] Workflow resumes correctly after a Notion write failure (checkpoint preserves approved `WeekSummary`).
-- [ ] Full end-to-end test passes: `weekforge summarize 7` on a seeded Notion fake produces expected summary row + expected PLAN_STATE row.
-- [ ] Test suite passes: `uv run pytest tests/tools/test_week_summary_renderer.py tests/tools/test_plan_state.py tests/workflows/test_extraction_end_to_end.py`.
+- [~] `render_week_summary` emits the exact legacy format: same section order, same delimiters, same role/status codes. Substring-level tests in place; byte-for-byte fixture-equality test is a follow-up.
+- [x] `PLAN_ADHERENCE` section omitted when `summary.plan_adherence is None`.
+- [x] `training_week_summaries` row for `W##` is updated (not duplicated) when step-2 pre-created it; otherwise created with a warning logged.
+- [x] PLAN_STATE incremental merge: weight chain extended, `weeks_completed` incremented, LLM-reasoned fields (trend, issue lifecycle) updated.
+- [x] PLAN_STATE bootstrap: compiles from all weekly summaries chronologically; empty skeleton when no summaries exist.
+- [x] PLAN_STATE written to `training_week_summaries` with `Week="PLAN_STATE"`.
+- [x] Workflow resumes correctly after a Notion write failure (checkpoint preserves approved `WeekSummary`).
+- [x] Full end-to-end test passes: `weekforge summarize-week 7` on a seeded Notion fake produces expected summary row + expected PLAN_STATE row.
+- [x] Test suite passes: `uv run pytest tests/tools/test_week_summary_renderer.py tests/tools/test_plan_state.py tests/workflows/test_extraction_end_to_end.py`.
 
-## Final `weekforge summarize` acceptance summary (step-1 complete)
+## Final `weekforge summarize-week` acceptance summary (step-1 complete)
 
-- [ ] `weekforge summarize <week>` runs the full pipeline: overwrite check → load context → Tier-0 extract → agent synth → HITL accept (feedback loop) → Notion write → PLAN_STATE update.
-- [ ] Checkpoint persistence works across terminal sessions at every step.
-- [ ] Run cost surfaced at completion (sum of all `agent` + `plan_state_agent` calls).
-- [ ] Output matches legacy `summarize_week.md` format semantically: same schema, same section content, same PLAN_STATE behavior.
+- [~] `weekforge summarize-week <week>` runs the full pipeline: ~~overwrite check~~ (pass-through — open follow-up) → load context → Tier-0 extract → agent synth → HITL accept (feedback loop) → Notion write → PLAN_STATE update.
+- [x] Checkpoint persistence works across terminal sessions at every step.
+- [x] Run cost surfaced at completion (sum of all `agent` + `plan_state_agent` calls).
+- [x] Output matches legacy `summarize_week.md` format semantically: same schema, same section content, same PLAN_STATE behavior.
