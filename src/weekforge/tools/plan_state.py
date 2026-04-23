@@ -1,6 +1,9 @@
 import re
+
 from pydantic import BaseModel, Field
+
 from weekforge.models.week_summary import WeekSummary
+
 
 class PlanState(BaseModel):
     mesocycle_name: str = "Unknown"
@@ -62,11 +65,12 @@ def parse_plan_state(text: str) -> PlanState:
     return state
 
 def update_mechanical_fields(state: PlanState, week: WeekSummary) -> PlanState:
-    # 1. Update weeks completed
+    """Update deterministic numeric fields before the agent call.
+
+    Mechanical updates (counts, averages, weight chains) are computed here so the
+    LLM only handles interpretive fields (trends, issues, preferences).
+    """
     state.weeks_completed += 1
-    
-    # 2. Update avg_completion
-    # completion string is usually "X/Y"
     try:
         done, total = map(int, week.completion.split("/"))
         week_pct = (done / total * 100) if total > 0 else 0.0
@@ -79,7 +83,6 @@ def update_mechanical_fields(state: PlanState, week: WeekSummary) -> PlanState:
     except Exception:
         pass
         
-    # 3. Adherence list append (we assume the first item is 'weekly:W01%->W02%...|avg:%')
     found_weekly = False
     for i, adv in enumerate(state.adherence):
         if adv.startswith("weekly:"):
@@ -103,8 +106,6 @@ def update_mechanical_fields(state: PlanState, week: WeekSummary) -> PlanState:
         except Exception:
             pass
             
-    # For MAIN_LIFTS we append mechanical weights based on exercise_log
-    # This is a bit heuristical; we match main lift names
     main_exercises = {e.name: e for e in week.exercise_log if e.role == "main"}
     for i, ml in enumerate(state.main_lifts):
         try:

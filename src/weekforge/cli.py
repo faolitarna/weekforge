@@ -3,12 +3,6 @@
 Commands are thin wrappers: construct a CheckpointStore, delegate to the workflow
 function, handle KeyboardInterrupt by printing a resume hint. All rendering and
 HITL logic lives in the workflow and hitl modules.
-
-Invoking `weekforge` bare shows help plus active checkpoint status — the user
-never has to remember thread IDs or which workflow was in progress. The callback
-validates required env vars on every invocation; a missing var yields a Rich
-panel instead of a raw Pydantic stack trace.
-
 """
 import uuid
 from collections.abc import Callable
@@ -108,7 +102,7 @@ def e2e(
 
 @app.command()
 def plan() -> None:
-    """Start or resume the planning lifecycle (not yet implemented — step 2)."""
+    """Start or resume the planning lifecycle (not yet implemented)."""
     console.print("[dim]Not yet implemented (step 2).[/dim]")
 
 
@@ -116,7 +110,7 @@ def plan() -> None:
 def summarize_week(week: int = typer.Argument(..., help="Week number, e.g. 7")) -> None:
     """Generate a weekly summary from completed training sessions."""
     from weekforge.tools.formatting import format_week_prefix
-    from weekforge.workflows.extraction import run_summarize
+    from weekforge.workflows.summarize_week import run_summarize
 
     store = _make_store()
     week_prefix = format_week_prefix(week)
@@ -135,15 +129,14 @@ def resume(
         console.print(f"[red]No checkpoint found for thread-id {thread_id}[/red]")
         raise typer.Exit(code=1)
 
-    # Dispatch by workflow field on the checkpoint record.
     if rec.workflow == "e2e":
         from weekforge.workflows.e2e import run_e2e
 
         _run_or_pause(thread_id, lambda: run_e2e(database_id=None, thread_id=thread_id, store=store))
         return
 
-    if rec.workflow == "extraction":
-        from weekforge.workflows.extraction import run_summarize
+    if rec.workflow in ("summarize_week", "extraction"):  # "extraction" is the legacy workflow name stored in old checkpoints
+        from weekforge.workflows.summarize_week import run_summarize
 
         _run_or_pause(thread_id, lambda: run_summarize("", thread_id, store))
         return

@@ -1,9 +1,14 @@
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from weekforge.checkpoint import CheckpointStore
-from weekforge.models.workflow_state import ExtractionState
-from weekforge.models.week_summary import WeekSummary
-from weekforge.models.week_summary import ImplicitFeedback, PainStatus, SectionRates
+from weekforge.models.week_summary import (
+    ImplicitFeedback,
+    PainStatus,
+    SectionRates,
+    WeekSummary,
+)
+from weekforge.models.workflow_state import SummarizeWeekState
+
 
 def make_dummy_week_summary():
     return WeekSummary(
@@ -24,21 +29,22 @@ def make_dummy_week_summary():
         trend=""
     )
 
+@patch("weekforge.tools.notion_api_gateway.get_title_property_name", return_value="Name")
 @patch("weekforge.tools.notion_api_gateway.create")
 @patch("weekforge.tools.notion_api_gateway.query")
-@patch("weekforge.agents.agent_run_with_metadata.run_with_metadata")
-def test_extraction_end_to_end(mock_run, mock_query, mock_create, tmp_path):
-    from weekforge.workflows.extraction import run_summarize
+@patch("weekforge.workflows.summarize_week.run_with_metadata")
+def test_extraction_end_to_end(mock_run, mock_query, mock_create, _mock_title, tmp_path):
+    from weekforge.workflows.summarize_week import run_summarize
     store = CheckpointStore(str(tmp_path / "checkpoints.sqlite"))
-    state = ExtractionState(week_prefix="W01", step="write", tier0_summary=make_dummy_week_summary(), last_output=make_dummy_week_summary())
-    store.save("test-tid", "extraction", "write", state)
+    state = SummarizeWeekState(week_prefix="W01", step="write", tier0_summary=make_dummy_week_summary(), last_output=make_dummy_week_summary())
+    store.save("test-tid", "summarize_week", "write", state)
     
     mock_query.side_effect = [[], []]
     mock_create.return_value = "new-page-id"
     
     # Bootstrap run returns updated plan state
-    from weekforge.tools.plan_state import PlanState
     from weekforge.models.llm_call_cost import CallMetadata
+    from weekforge.tools.plan_state import PlanState
     mock_run.return_value = (
         MagicMock(output=PlanState(mesocycle_name="Bootstrap", weeks_completed=1)),
         CallMetadata(input_tokens=10, output_tokens=10, cost_eur=0.01, latency_ms=100, model_used="test"),

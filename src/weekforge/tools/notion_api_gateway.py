@@ -58,13 +58,6 @@ class NotionAPIError(Exception):
 _client = Client(auth=settings.notion_token)
 
 
-def _is_rate_limit_error(e: Exception) -> bool:
-    """Check if the Notion API error is specifically a rate limit error (429)."""
-    if isinstance(e, APIResponseError):
-        return e.status == 429
-    return False
-
-
 @retry(
     retry=retry_if_exception_type(APIResponseError),
     wait=wait_exponential(multiplier=1, min=1, max=4),
@@ -93,6 +86,21 @@ def _retry_api_call(func: Any, *args: Any, **kwargs: Any) -> Any:
             raise NotionAPIError(f"Notion API error: {e}") from e
     except Exception as e:
         raise NotionAPIError(f"Unexpected error interfacing with Notion: {e}") from e
+
+
+def get_title_property_name(database_id: str) -> str:
+    """Notion doesn't guarantee the title property is named 'Title' — look it up.
+    Falls back to 'Title' if neither public-API nor data-source schema exposes it.
+    """
+    db = _retry_api_call(_client.databases.retrieve, database_id=database_id)
+    for prop_name, prop_def in db.get("properties", {}).items():
+        if prop_def.get("type") == "title":
+            return prop_name
+    schema = db.get("data_sources", [{}])[0].get("schema", {})
+    for prop_name, prop_def in schema.items():
+        if prop_def.get("type") == "title":
+            return prop_name
+    return "Title"
 
 
 def query(database_id: str, filters: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:

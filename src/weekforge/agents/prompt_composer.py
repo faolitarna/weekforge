@@ -8,16 +8,14 @@ Response style — caveman-lite:
 
 
 def compose_system_prompt(base: str, caveman_mode: bool) -> str:
-    """Pure composer: returns base unchanged when flag is False."""
     if not caveman_mode:
         return base
     return base + "\n\n" + CAVEMAN_LITE_DIRECTIVE
 
 def compose_static_instructions(caveman_mode: bool) -> str:
-    """Concatenate coaching persona + guardrails + (optional) caveman directive.
-    Passed to Agent(instructions=...) — static, known at construction time,
-    eligible for prompt-cache prefix."""
-    from weekforge.prompts.loader import load_prompt, Prompt
+    """Passed to Agent(instructions=...) — static prefix is cache-eligible.
+    Dynamic context (user profile, Tier-0 facts) comes from @agent.instructions decorators."""
+    from weekforge.prompts.loader import Prompt, load_prompt
     sections = [
         "## Coaching Persona\n\n" + load_prompt(Prompt.COACHING_PERSONA),
         "## Safety Guardrails\n\n" + load_prompt(Prompt.COACHING_GUARDRAILS),

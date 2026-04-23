@@ -1,5 +1,17 @@
-from weekforge.models.week_summary import WeekSummary, SessionLine, ExerciseLogEntry, CardioEntry, ClimbingEntry, PainStatus, ImplicitFeedback, SectionRates, PlanAdherence, ModificationPattern
+from weekforge.models.week_summary import (
+    CardioEntry,
+    ClimbingEntry,
+    ExerciseLogEntry,
+    ImplicitFeedback,
+    ModificationPattern,
+    PainStatus,
+    PlanAdherence,
+    SectionRates,
+    SessionLine,
+    WeekSummary,
+)
 from weekforge.tools.week_summary_renderer import render_week_summary
+
 
 def test_render_week_summary():
     summary = WeekSummary(

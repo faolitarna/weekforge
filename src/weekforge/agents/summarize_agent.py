@@ -1,11 +1,14 @@
 from dataclasses import dataclass
+
 from pydantic_ai import Agent, RunContext
+
 from weekforge.agents.openai_model_factory import build_openai_model
 from weekforge.agents.prompt_composer import compose_static_instructions
 from weekforge.config.env import settings
 from weekforge.config.llm_profiles import resolve_llm_profile
 from weekforge.models.user_profile import UserProfile
-from weekforge.models.week_summary import WeekSummary, ImplicitFeedback, PlanAdherence
+from weekforge.models.week_summary import ImplicitFeedback, PlanAdherence, WeekSummary
+
 
 @dataclass
 class SummarizeDeps:

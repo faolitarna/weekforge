@@ -1,5 +1,12 @@
-from weekforge.tools.plan_state import parse_plan_state, update_mechanical_fields, render_plan_state
-from weekforge.models.week_summary import WeekSummary, ImplicitFeedback, SectionRates, PainStatus, ExerciseLogEntry
+from weekforge.models.week_summary import (
+    ExerciseLogEntry,
+    ImplicitFeedback,
+    PainStatus,
+    SectionRates,
+    WeekSummary,
+)
+from weekforge.tools.plan_state import parse_plan_state, update_mechanical_fields
+
 
 def test_plan_state_incremental_mechanical_updates():
     text = """PLAN_STATE:W01-W05

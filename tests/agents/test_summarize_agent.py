@@ -1,8 +1,9 @@
-import pytest
-from unittest.mock import patch, MagicMock
-from weekforge.agents.summarize_agent import summarize_agent, SummarizeDeps
+from unittest.mock import MagicMock, patch
+
+from weekforge.agents.summarize_agent import SummarizeDeps, summarize_agent
 from weekforge.models.user_profile import UserProfile
-from weekforge.models.week_summary import ImplicitFeedback, WeekSummary, SectionRates
+from weekforge.models.week_summary import ImplicitFeedback, SectionRates, WeekSummary
+
 
 @patch("weekforge.agents.summarize_agent.summarize_agent.run_sync")
 def test_summarize_agent(mock_run):
@@ -10,7 +11,6 @@ def test_summarize_agent(mock_run):
         highlights=["Test highlight"],
         trend="flat"
     ))
-    from weekforge.models.week_summary import SectionRates
     deps = SummarizeDeps(
         user_profile=UserProfile.model_construct(markdown="test"),
         implicit_feedback=ImplicitFeedback(

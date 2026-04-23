@@ -1,14 +1,17 @@
 from datetime import UTC, datetime
 from typing import Any
+
 from pydantic import BaseModel, Field
+
 from weekforge.models.llm_call_cost import CallMetadata
 from weekforge.models.week_summary import WeekSummary
 
-class ExtractionState(BaseModel):
+
+class SummarizeWeekState(BaseModel):
     week_prefix: str
     overwrite_confirmed: bool = False
     user_profile_markdown: str | None = None
-    raw_sessions_json: str | None = None
+    raw_sessions_json: str | None = None  # str not list — checkpoint persistence requires JSON-serializable state
     tier0_summary: WeekSummary | None = None
     last_output: WeekSummary | None = None
     messages_json: list[dict[str, Any]] = Field(default_factory=list)
@@ -16,8 +19,6 @@ class ExtractionState(BaseModel):
     pending_feedback: str | None = None
     step: str = "overwrite_check"
     written_page_id: str | None = None
-    
-    # PLAN_STATE fields
     is_bootstrap: bool | None = None
     plan_state_raw: str | None = None
     plan_state_page_id: str | None = None

@@ -1,5 +1,6 @@
 from weekforge.models.week_summary import WeekSummary
 
+
 def render_week_summary(summary: WeekSummary) -> str:
     lines = []
     lines.append(f"WEEK_SUMMARY:{summary.week_prefix}")
@@ -18,7 +19,6 @@ def render_week_summary(summary: WeekSummary) -> str:
     if summary.exercise_log:
         lines.append("EXERCISE_LOG:")
         for e in summary.exercise_log:
-            # Format planned->actual
             sets_str = f"{e.planned_sets}->{e.actual_sets}" if e.actual_sets and e.actual_sets != e.planned_sets else str(e.planned_sets)
             reps_str = f"{e.planned_reps}->{e.actual_reps}" if e.actual_reps and e.actual_reps != e.planned_reps else str(e.planned_reps)
             weight_str = f"{e.planned_weight}->{e.actual_weight}" if e.actual_weight and e.actual_weight != e.planned_weight else str(e.planned_weight)

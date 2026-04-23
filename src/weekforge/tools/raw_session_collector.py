@@ -2,7 +2,12 @@ import logging
 from collections import defaultdict
 
 from weekforge.models.raw_week_data import RawBlock, RawSession, RawWeekData
-from weekforge.models.week_summary import ImplicitFeedback, SectionRates, SessionCheckCount, SkippedPattern
+from weekforge.models.week_summary import (
+    ImplicitFeedback,
+    SectionRates,
+    SessionCheckCount,
+    SkippedPattern,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -72,11 +77,6 @@ def compute_checkbox_analysis(sessions: list[RawSession]) -> ImplicitFeedback:
     total_exercises = 0
     per_session: list[SessionCheckCount] = []
 
-    # section tracking: {exercise_text: {section: {checked: int, total: int}}}
-    section_buckets: dict[str, dict[str, dict[str, int]]] = defaultdict(
-        lambda: defaultdict(lambda: {"checked": 0, "total": 0})
-    )
-    # exercise-level tracking for frequently_skipped / always_completed
     exercise_stats: dict[str, dict[str, int]] = defaultdict(lambda: {"checked": 0, "total": 0})
 
     # section-level checkbox counts for SectionRates

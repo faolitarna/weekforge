@@ -1,5 +1,7 @@
 from dataclasses import dataclass
+
 from pydantic_ai import Agent, RunContext
+
 from weekforge.agents.openai_model_factory import build_openai_model
 from weekforge.agents.prompt_composer import compose_static_instructions
 from weekforge.config.env import settings
@@ -7,11 +9,12 @@ from weekforge.config.llm_profiles import resolve_llm_profile
 from weekforge.models.week_summary import WeekSummary
 from weekforge.tools.plan_state import PlanState
 
+
 @dataclass
 class PlanStateDeps:
     existing_plan_state: PlanState
     new_week: WeekSummary | None = None
-    all_weeks: list[WeekSummary] | None = None # For bootstrap mode
+    all_weeks: list[WeekSummary] | None = None
 
 _PLAN_STATE_TASK = """\
 You are an expert training coach merging new weekly data into a cumulative `PLAN_STATE`.

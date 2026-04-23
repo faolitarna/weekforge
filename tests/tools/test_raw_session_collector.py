@@ -1,12 +1,13 @@
-import pytest
 from unittest.mock import MagicMock
 
+import pytest
+
+from weekforge.models.raw_week_data import RawBlock, RawSession
 from weekforge.tools.raw_session_collector import (
+    assemble_raw_week,
     collect_blocks,
     compute_checkbox_analysis,
-    assemble_raw_week,
 )
-from weekforge.models.raw_week_data import RawBlock, RawSession
 
 
 def _make_to_do_block(text: str, checked: bool) -> dict:
