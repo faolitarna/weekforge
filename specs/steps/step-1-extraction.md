@@ -16,21 +16,22 @@ Step 1 is split into four sub-steps so each can be implemented independently by 
 |---|----------|-------|--------|
 | 1a | [Context & CLI](./step-1a-context-and-cli.md) | Prompts dir (persona, guardrails), `.env` DB IDs, user-profile Notion page + loader, `weekforge summarize-week <week>` CLI | ✅ |
 | 1b | [Tier-0 Extraction](./step-1b-tier0-extraction.md) | Thin Tier-0: block/comment collection + checkbox arithmetic. Pydantic `WeekSummary` contract. | ✅ |
-| 1c | [Summary Agent & Workflow](./step-1c-summary-agent.md) | `summarize_agent` (Pydantic AI), `extraction.py` workflow, single HITL acceptance gate with feedback loop | ✅ |
+| 1c | [Summary Agent & Workflow](./step-1c-summary-agent.md) | `summarize_agent` (Pydantic AI), `summarize_week.py` workflow, single HITL acceptance gate with feedback loop | ✅ |
 | 1d | [Notion Write & PLAN_STATE](./step-1d-notion-write-and-plan-state.md) | `WeekSummary` → legacy text renderer, Notion write, PLAN_STATE incremental/bootstrap | ✅ |
+| 1e | [Summary Format Alignment](./step-1e-summary-formatting.md) | Align renderer to source-material `<summary-format>` — pipe-delimited, token-optimized for LLM consumption | 🔲 |
 
 ## Implementation Status
 
 All four sub-steps shipped in commits `2a072b3` (1c), `0da0b93` (1d), `cdc551c` (Notion API hardening — see [DEC-008](../decision-log.md)).
 
 **Remaining follow-ups (not blockers, tracked at the spec level):**
-- `overwrite_check` workflow step is a no-op pass-through in [workflows/extraction.py](../../src/weekforge/workflows/extraction.py) — the prompt described in 1a/1c is not wired yet.
-- A few tests predate 1d and still assert the old `NotImplementedError("step-1d")` stub behavior; see 1c's Implementation Status for the list.
+- `overwrite_check` workflow step is a no-op pass-through in [workflows/summarize_week.py](../../src/weekforge/workflows/summarize_week.py) — the prompt described in 1a/1c is not wired yet.
+- **Test isolation: prevent accidental real Notion API calls.** `notion_api_gateway` creates `_client = Client(auth=...)` at module import time. Any test that imports from that module gets a live client; incomplete mocks silently leak real HTTP requests. Fix: (a) add a conftest fixture that globally patches `_client` for all unit tests, (b) consider lazy client initialization or a factory, (c) mark intentional integration tests with `@pytest.mark.integration` per feature-tester agent guidelines. See also: `workflows/summarize_week.py` still imports `_client` directly for `assemble_raw_week` — another private API boundary violation to clean up.
 
 ## Architectural Summary
 
 - **Source material fidelity.** Every behavior from `summarize_week.md` — week-prefix parse, existing-summary overwrite check, exercise role classification, checkbox analysis, delta analysis, summary format, PLAN_STATE update — maps to a named acceptance criterion in one of the sub-steps.
-- **Tier split.** Deterministic work (parsing, arithmetic, format rendering) is Tier-0 Python in `tools/extraction.py`. Synthesis (interpretation, wins/issues, recommendations, highlights/trend) is Tier-2 in `summarize_agent`.
+- **Tier split.** Deterministic work (parsing, arithmetic, format rendering) is Tier-0 Python in `tools/raw_session_collector.py`, `tools/plan_state.py`, and `tools/week_summary_renderer.py`. Synthesis (interpretation, wins/issues, recommendations, highlights/trend) is Tier-2 in `summarize_agent`.
 - **HITL shape.** One gate only: *accept summary*. Fetch validation removed — Notion API fetch is trusted; a genuinely empty result is a hard fail with a clear message. The accept gate renders `highlights` + `trend` for quick review, with the full `WeekSummary` available as a collapsed panel; feedback re-runs the agent with message history (same pattern as [e2e.py](../../src/weekforge/workflows/e2e.py)).
 - **Prompt composition.** `summarize_agent` uses Pydantic AI `instructions=` (static, for persona + guardrails, cacheable prefix) plus `@agent.instructions` decorators (dynamic, for per-run user profile and Tier-0 facts via `RunContext`). See sub-step 1c for the composition.
 - **Config storage split.** Persona and guardrails ship as local markdown in `src/weekforge/prompts/` (internal, stable). User profile lives in a single Notion page loaded as markdown (user-changeable, no typed properties — see DEC-007).

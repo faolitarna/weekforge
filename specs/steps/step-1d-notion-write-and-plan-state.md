@@ -6,7 +6,7 @@
 
 **Implementation notes / deviations from draft:**
 - **Notion 100-block batching.** Notion's `blocks.children.append` caps at 100 children per request. Both `write` and `plan_state_update` steps chunk the rendered block list into 100-item batches before calling `append`. Not documented in the draft — necessary for weeks with long exercise logs.
-- **Dynamic title-property discovery.** The title property is not guaranteed to be named `"Title"`. `_get_title_property_name(database_id)` in `workflows/extraction.py` probes both the public API schema (`properties[*].type == "title"`) and the internal data-source schema (`data_sources[0].schema[*].type == "title"`) before falling back to the string `"Title"`.
+- **Dynamic title-property discovery.** The title property is not guaranteed to be named `"Title"`. `_get_title_property_name(database_id)` in `workflows/summarize_week.py` probes both the public API schema (`properties[*].type == "title"`) and the internal data-source schema (`data_sources[0].schema[*].type == "title"`) before falling back to the string `"Title"`.
 - **Week filter value.** Notion stores the `Week` property as a plain numeric string (`"1"`), not `"W01"`. Workflow parses `int(state.week_prefix[1:])` and filters client-side against the rich_text `plain_text`; `filter_properties` in `data_sources.query` fails schema validation, so it was removed.
 - **`RunCost` summary panel.** On `done`, the workflow prints a Rich panel with total tokens, latency, call count, and cost (aggregated across both `summarize_agent` and `plan_state_agent`). Not in the draft; added for observability.
 - **PLAN_STATE page-id logging.** After a successful bootstrap write, the created page ID is logged so users can verify via the Notion UI.
@@ -27,7 +27,7 @@ Step 1c complete (approved `WeekSummary` produced, workflow pauses at `write` st
 | `src/weekforge/tools/week_summary_renderer.py` | NEW | `WeekSummary` → legacy text format (Tier-0, pure string building) |
 | `src/weekforge/tools/plan_state.py` | NEW | PLAN_STATE query, incremental merge helpers, bootstrap composer |
 | `src/weekforge/agents/plan_state_agent.py` | NEW | Tier-2 agent for PLAN_STATE update (merge reasoning requires LLM) |
-| `src/weekforge/workflows/extraction.py` | UPDATE | Replace `write` step stub with real implementation; add `update_plan_state` step |
+| `src/weekforge/workflows/summarize_week.py` | UPDATE | Replace `write` step stub with real implementation; add `update_plan_state` step |
 | `tests/tools/test_week_summary_renderer.py` | NEW | Round-trip tests against the legacy text format |
 | `tests/tools/test_plan_state.py` | NEW | Incremental merge + bootstrap unit tests |
 
@@ -129,7 +129,7 @@ Step transitions persist before each LLM call (same pattern as `agent` step in 1
 - `test_render_omits_plan_adherence_when_none` — `plan_adherence=None` → section absent.
 - `test_plan_state_incremental_mechanical_updates` — new week merged; `weeks_completed` incremented, `avg_completion` recalculated, `weekly` chain appended.
 - `test_plan_state_bootstrap_skeleton_when_no_summaries` — returns an empty PlanState, no LLM call made.
-- `tests/workflows/test_extraction_end_to_end.py` — full path from `weekforge summarize-week 7` to both Notion writes (weekly row + PLAN_STATE row), using fake Notion + fake agent.
+- `tests/workflows/test_summarize_week_end_to_end.py` — full path from `weekforge summarize-week 7` to both Notion writes (weekly row + PLAN_STATE row), using fake Notion + fake agent.
 
 ## Acceptance Criteria
 
@@ -141,7 +141,7 @@ Step transitions persist before each LLM call (same pattern as `agent` step in 1
 - [x] PLAN_STATE written to `training_week_summaries` with `Week="PLAN_STATE"`.
 - [x] Workflow resumes correctly after a Notion write failure (checkpoint preserves approved `WeekSummary`).
 - [x] Full end-to-end test passes: `weekforge summarize-week 7` on a seeded Notion fake produces expected summary row + expected PLAN_STATE row.
-- [x] Test suite passes: `uv run pytest tests/tools/test_week_summary_renderer.py tests/tools/test_plan_state.py tests/workflows/test_extraction_end_to_end.py`.
+- [x] Test suite passes: `uv run pytest tests/tools/test_week_summary_renderer.py tests/tools/test_plan_state.py tests/workflows/test_summarize_week_end_to_end.py`.
 
 ## Final `weekforge summarize-week` acceptance summary (step-1 complete)
 

@@ -12,8 +12,8 @@ Step 1 complete (extraction subsystem, PLAN_STATE exists).
 
 | File | Purpose |
 |------|---------|
-| `src/weekforge/workflows/planning.py` | Planning workflow (Lifecycle A, part 1) |
-| `src/weekforge/tools/planning.py` | Context loading tool functions (templates, feedback, PLAN_STATE) |
+| `src/weekforge/workflows/plan_week.py` | Planning workflow (Lifecycle A, part 1) |
+| `src/weekforge/tools/plan_week.py` | Context loading tool functions (templates, feedback, PLAN_STATE) |
 | `src/weekforge/agents/ (e2e_agent.py, openai_model_factory.py, agent_run_with_metadata.py, prompt_composer.py)` | Add `planning_agent` definition |
 | `src/weekforge/models/workflow_state.py` | Extend with planning-specific state model |
 | Updates to `cli.py` | Wire `weekforge plan` command |

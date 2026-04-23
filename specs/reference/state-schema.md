@@ -61,9 +61,9 @@ Grows as the workflow progresses. Stored on the Pydantic state model as plain fi
 - **Workflow-scoped models:** Each workflow defines its own state model with only the fields it needs. No monolithic shared state class.
 - **Context is disposable:** Layer B fields are loaded fresh every time they're needed. Stale context is never reused from a previous checkpoint.
 
-## Extraction workflow — `ExtractionState` (step-1)
+## Extraction workflow — `SummarizeWeekState` (step-1)
 
-The Layer A/B/C schema above was written for the planning workflow. The extraction workflow (`summarize-week`) uses a separate Pydantic model — [`ExtractionState`](../../src/weekforge/models/workflow_state.py) — with a different Layer-A shape:
+The Layer A/B/C schema above was written for the planning workflow. The extraction workflow (`summarize-week`) uses a separate Pydantic model — [`SummarizeWeekState`](../../src/weekforge/models/workflow_state.py) — with a different Layer-A shape:
 
 | Field | Type | Purpose |
 |-------|------|---------|

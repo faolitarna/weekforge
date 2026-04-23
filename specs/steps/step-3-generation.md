@@ -12,9 +12,9 @@ Step 2 complete (planning engine, approved `week_plan` in state).
 
 | File | Purpose |
 |------|---------|
-| `src/weekforge/workflows/generation.py` | Generation loop (Lifecycle A, part 2) |
+| `src/weekforge/workflows/draft_session.py` | Generation loop (Lifecycle A, part 2) |
 | `src/weekforge/workflows/evaluator.py` | Deterministic Evaluator (Tier-0 Python validation) |
-| `src/weekforge/tools/generation.py` | Session writing tool functions (idempotent Notion writes) |
+| `src/weekforge/tools/draft_session.py` | Session writing tool functions (idempotent Notion writes) |
 | `src/weekforge/agents/ (e2e_agent.py, openai_model_factory.py, agent_run_with_metadata.py, prompt_composer.py)` | Add `generation_agent` definition |
 | `src/weekforge/models/workflow_state.py` | Extend with generation-specific state model |
 

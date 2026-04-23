@@ -187,7 +187,7 @@ Before the workflow proper begins (spec lives in step-1c, but the CLI prologue h
 
 Implementation of the `run_summarize` stub in 1a: perform the overwrite check, load prompts + user profile, print a "context ready" summary panel (Rich), then raise `NotImplementedError("Workflow body lands in step-1c")`. This proves the loader + CLI wiring end-to-end without blocking on 1b/1c.
 
-**Status note:** As shipped, 1a's `run_summarize` stub was superseded by step-1c before the overwrite-check prompt was wired. Workflow currently pass-throughs `overwrite_check` → `load_context` without querying (see [workflows/extraction.py](../../src/weekforge/workflows/extraction.py) — the `overwrite_check` branch is a placeholder). Still open.
+**Status note:** As shipped, 1a's `run_summarize` stub was superseded by step-1c before the overwrite-check prompt was wired. Workflow currently pass-throughs `overwrite_check` → `load_context` without querying (see [workflows/summarize_week.py](../../src/weekforge/workflows/summarize_week.py) — the `overwrite_check` branch is a placeholder). Still open.
 
 ## Acceptance Criteria
 

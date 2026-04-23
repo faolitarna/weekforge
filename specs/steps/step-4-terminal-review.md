@@ -12,8 +12,8 @@ Step 1 complete (extraction subsystem — weekly summaries must exist in Notion)
 
 | File | Purpose |
 |------|---------|
-| `src/weekforge/workflows/terminal.py` | Terminal review workflow (Lifecycle C) |
-| `src/weekforge/tools/terminal.py` | Summary aggregation tool functions |
+| `src/weekforge/workflows/review_mesocycle.py` | Terminal review workflow (Lifecycle C) |
+| `src/weekforge/tools/review_mesocycle.py` | Summary aggregation tool functions |
 | `src/weekforge/agents/ (e2e_agent.py, openai_model_factory.py, agent_run_with_metadata.py, prompt_composer.py)` | Add `terminal_agent` definition |
 | Updates to `cli.py` | Wire `weekforge review` command |
 
