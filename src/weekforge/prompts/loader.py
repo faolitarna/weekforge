@@ -6,6 +6,7 @@ from enum import StrEnum
 class Prompt(StrEnum):
     COACHING_PERSONA = "coaching_persona.md"
     COACHING_GUARDRAILS = "coaching_guardrails.md"
+    FEEDBACK_INTERPRETATION = "feedback-interpretation.md"
 
 
 @functools.cache

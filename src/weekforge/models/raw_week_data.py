@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -6,7 +7,7 @@ class RawBlock:
     block_type: str
     text: str
     checked: bool | None
-    raw: dict
+    raw: dict[str, Any]
 
 
 @dataclass
@@ -15,6 +16,7 @@ class RawSession:
     name: str
     blocks: list[RawBlock] = field(default_factory=list)
     comments: list[str] = field(default_factory=list)
+    done: bool = False
 
 
 @dataclass

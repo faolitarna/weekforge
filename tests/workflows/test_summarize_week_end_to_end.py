@@ -3,7 +3,6 @@ from unittest.mock import MagicMock, patch
 from weekforge.checkpoint import CheckpointStore
 from weekforge.models.week_summary import (
     ImplicitFeedback,
-    PainStatus,
     SectionRates,
     WeekSummary,
 )
@@ -16,7 +15,7 @@ def make_dummy_week_summary():
         completion="0/0",
         sessions=[],
         exercise_log=[],
-        pain_status=PainStatus(si_joint="ok", other="ok"),
+        pain_status=[],
         implicit_feedback=ImplicitFeedback(
             total_checked=0,
             total_exercises=0,
@@ -36,7 +35,7 @@ def make_dummy_week_summary():
 def test_extraction_end_to_end(mock_run, mock_query, mock_create, _mock_title, tmp_path):
     from weekforge.workflows.summarize_week import run_summarize
     store = CheckpointStore(str(tmp_path / "checkpoints.sqlite"))
-    state = SummarizeWeekState(week_prefix="W01", step="write", tier0_summary=make_dummy_week_summary(), last_output=make_dummy_week_summary())
+    state = SummarizeWeekState(week_prefix="W01", step="write", tier0_summary=make_dummy_week_summary(), last_output=make_dummy_week_summary(), is_bootstrap=True)
     store.save("test-tid", "summarize_week", "write", state)
     
     mock_query.side_effect = [[], []]

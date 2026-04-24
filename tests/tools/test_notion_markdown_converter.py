@@ -8,7 +8,6 @@ from weekforge.tools.notion_markdown_converter import (
     convert_markdown_to_blocks,
 )
 
-
 # ---------------------------------------------------------------------------
 # _rich_text_chunks
 # ---------------------------------------------------------------------------

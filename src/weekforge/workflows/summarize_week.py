@@ -1,4 +1,5 @@
 import logging
+from typing import Any, Literal
 
 from pydantic_ai.messages import ModelMessagesTypeAdapter
 from rich.console import Console
@@ -18,9 +19,9 @@ WORKFLOW = "summarize_week"
 MAX_ITERATIONS = 3
 
 
-def _get_text_prop(page: dict, prop_name: str) -> str:
+def _get_text_prop(page: dict[str, Any], prop_name: str) -> str:
     items = page.get("properties", {}).get(prop_name, {}).get("rich_text", [])
-    return items[0].get("plain_text", "") if items else ""
+    return "".join(item.get("plain_text", "") for item in items)
 
 
 def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> None:
@@ -62,17 +63,26 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
                     f"No session pages found for {state.week_prefix} in training_sessions DB."
                 )
 
+            # Read Plan property from training_week_summaries
+            all_summary_pages = notion.query(database_id=settings.notion_db_training_week_summaries)
+            plan_records = [p for p in all_summary_pages if _get_text_prop(p, "Week") == state.week_prefix]
+            if plan_records:
+                plan_text = _get_text_prop(plan_records[0], "Plan")
+                state.planned_plan_markdown = plan_text or None
+            else:
+                state.planned_plan_markdown = None
+
             # Assemble raw week data
             raw_week = assemble_raw_week(
                 week_prefix=state.week_prefix,
                 session_pages=session_pages,
                 notion_client=notion_client,
-                planned_plan_markdown=None,
+                planned_plan_markdown=state.planned_plan_markdown,
             )
             # Serialize sessions for checkpoint persistence (exclude bulky raw block dicts)
             import json
             state.raw_sessions_json = json.dumps([
-                {"name": s.name, "page_id": s.page_id,
+                {"name": s.name, "page_id": s.page_id, "done": s.done,
                  "blocks": [{"block_type": b.block_type, "text": b.text, "checked": b.checked} for b in s.blocks],
                  "comments": s.comments}
                 for s in raw_week.sessions
@@ -110,33 +120,37 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
             for s_data in raw_sessions_data:
                 blocks = s_data["blocks"]
                 total = sum(1 for b in blocks if b["block_type"] == "to_do")
-                done = sum(1 for b in blocks if b["block_type"] == "to_do" and b["checked"])
-                status = "done" if total > 0 and done == total else ("partial" if done > 0 else "skip")
+                checked = sum(1 for b in blocks if b["block_type"] == "to_do" and b["checked"])
+                session_done = s_data.get("done", False)
+                status: Literal["done", "skip", "partial"] = "done" if session_done else ("partial" if checked > 0 else "skip")
                 raw_comments = s_data.get("comments", [])
                 comment_text = " | ".join(raw_comments) if raw_comments else ""
                 session_lines.append(SessionLine(
                     name=s_data["name"],
                     status=status,
-                    exercises_done=done,
+                    exercises_done=checked,
                     exercises_total=total,
                     pain_status=None,
                     comment=comment_text,
                 ))
 
-            completion_pct = round(implicit_fb.total_checked / max(implicit_fb.total_exercises, 1) * 100)
+            done_count = sum(1 for s in raw_sessions_data if s.get("done", False))
+            total_count = len(session_lines)
             state.tier0_summary = WeekSummary(
                 week_prefix=state.week_prefix,
-                completion=f"{completion_pct}% ({implicit_fb.total_checked}/{implicit_fb.total_exercises})",
+                completion=f"{done_count}/{total_count}",
                 sessions=session_lines,
-                exercise_log=[],
+                exercise_log=[],  # LLM fills from raw session blocks
+
                 pain_status=[],
                 implicit_feedback=implicit_fb,
             )
             _console.print(f"[green]Tier-0 summary: {state.tier0_summary.completion}[/green]")
-            state.step = "agent"
+            state.step = "plan_state_check"
             store.save(thread_id, WORKFLOW, state.step, state)
 
         elif state.step == "agent":
+            _console.print("[dim]agent: calling summarize_agent…[/dim]")
             store.save(thread_id, WORKFLOW, state.step, state)
             prev = ModelMessagesTypeAdapter.validate_python(state.messages_json) if state.messages_json else None
 
@@ -146,11 +160,15 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
             profile_md = state.user_profile_markdown or "Not provided"
             profile = UserProfile.model_construct(page_id="state", markdown=profile_md)
 
+            assert state.tier0_summary is not None
             deps = SummarizeDeps(
                 user_profile=profile,
                 implicit_feedback=state.tier0_summary.implicit_feedback,
                 plan_adherence=state.tier0_summary.plan_adherence,
                 tier0_summary_json=state.tier0_summary.model_dump_json(exclude_none=True),
+                raw_sessions_json=state.raw_sessions_json or "[]",
+                planned_plan_markdown=state.planned_plan_markdown,
+                plan_state_raw=state.plan_state_raw,
             )
 
             prompt = f"Summarize week {state.week_prefix}."
@@ -242,18 +260,18 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
                 )
                 state.written_page_id = page_id
                 
-            state.step = "plan_state_check"
+            state.step = "plan_state_update"
             store.save(thread_id, WORKFLOW, state.step, state)
 
         elif state.step == "plan_state_check":
             store.save(thread_id, WORKFLOW, state.step, state)
             from weekforge.config.env import settings
             from weekforge.tools import notion_api_gateway as notion
-            
-            _logger.info("Checking PLAN_STATE.")
+
+            _console.print("[dim]plan_state_check: querying training_week_summaries…[/dim]")
             all_summary_pages = notion.query(database_id=settings.notion_db_training_week_summaries)
             records = [p for p in all_summary_pages if _get_text_prop(p, "Week") == "PLAN_STATE"]
-            
+
             if records:
                 page_id = records[0]["id"]
                 page = notion.fetch(page_id)
@@ -268,10 +286,12 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
                 state.plan_state_raw = raw_text
                 state.plan_state_page_id = page_id
                 state.is_bootstrap = False
+                _console.print(f"[dim]plan_state_check: found PLAN_STATE ({len(raw_text)} chars)[/dim]")
             else:
                 state.is_bootstrap = True
-                
-            state.step = "plan_state_update"
+                _console.print("[dim]plan_state_check: no PLAN_STATE found (bootstrap)[/dim]")
+
+            state.step = "agent"
             store.save(thread_id, WORKFLOW, state.step, state)
             
         elif state.step == "plan_state_update":
@@ -291,15 +311,16 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
             
             assert state.is_bootstrap is not None
             
+            assert state.last_output is not None
             if not state.is_bootstrap:
                 _logger.info("Running incremental PLAN_STATE update.")
                 existing_ps = parse_plan_state(state.plan_state_raw or "")
                 existing_ps = update_mechanical_fields(existing_ps, state.last_output)
-                
-                deps = PlanStateDeps(existing_plan_state=existing_ps, new_week=state.last_output)
+
+                plan_deps = PlanStateDeps(existing_plan_state=existing_ps, new_week=state.last_output)
                 prompt = "Update the plan state logically based on the new week."
                 result, meta, _ = run_with_metadata(
-                    plan_state_agent, prompt, deps=deps, message_history=None
+                    plan_state_agent, prompt, deps=plan_deps, message_history=None
                 )
                 updated_ps = result.output
                 cost.add(meta)
@@ -316,10 +337,10 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
                 )
             else:
                 _logger.info("Bootstrapping PLAN_STATE.")
-                deps = PlanStateDeps(existing_plan_state=PlanState(), all_weeks=[state.last_output])
+                plan_deps = PlanStateDeps(existing_plan_state=PlanState(), all_weeks=[state.last_output])
                 prompt = "Bootstrap plan state from provided weeks."
                 result, meta, _ = run_with_metadata(
-                    plan_state_agent, prompt, deps=deps, message_history=None
+                    plan_state_agent, prompt, deps=plan_deps, message_history=None
                 )
                 updated_ps = result.output
                 cost.add(meta)

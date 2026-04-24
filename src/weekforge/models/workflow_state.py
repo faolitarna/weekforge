@@ -20,6 +20,7 @@ class SummarizeWeekState(BaseModel):
     step: str = "overwrite_check"
     written_page_id: str | None = None
     is_bootstrap: bool | None = None
+    planned_plan_markdown: str | None = None
     plan_state_raw: str | None = None
     plan_state_page_id: str | None = None
     

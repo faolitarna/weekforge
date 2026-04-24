@@ -186,7 +186,7 @@ def test_render_pain_status_exact_line_no_extras():
     ))
     lines = rendered.splitlines()
     assert "- si_joint:stiff" in lines
-    assert not any(l.startswith("- si_joint:stiff|") for l in lines)
+    assert not any(line.startswith("- si_joint:stiff|") for line in lines)
 
 
 def test_render_multiple_joint_entries():

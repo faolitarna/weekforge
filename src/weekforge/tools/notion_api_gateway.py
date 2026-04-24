@@ -95,11 +95,11 @@ def get_title_property_name(database_id: str) -> str:
     db = _retry_api_call(_client.databases.retrieve, database_id=database_id)
     for prop_name, prop_def in db.get("properties", {}).items():
         if prop_def.get("type") == "title":
-            return prop_name
+            return str(prop_name)
     schema = db.get("data_sources", [{}])[0].get("schema", {})
     for prop_name, prop_def in schema.items():
         if prop_def.get("type") == "title":
-            return prop_name
+            return str(prop_name)
     return "Title"
 
 

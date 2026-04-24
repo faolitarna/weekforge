@@ -22,7 +22,10 @@ def test_summarize_agent(mock_run):
             always_completed=[]
         ),
         plan_adherence=None,
-        tier0_summary_json="{}"
+        tier0_summary_json="{}",
+        raw_sessions_json="[]",
+        planned_plan_markdown=None,
+        plan_state_raw=None,
     )
     result = summarize_agent.run_sync("test", deps=deps)
     assert isinstance(result.data, WeekSummary)

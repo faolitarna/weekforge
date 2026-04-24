@@ -1,5 +1,6 @@
 import logging
 from collections import defaultdict
+from typing import Any
 
 from weekforge.models.raw_week_data import RawBlock, RawSession, RawWeekData
 from weekforge.models.week_summary import (
@@ -14,15 +15,15 @@ logger = logging.getLogger(__name__)
 _HEADING_TYPES = {"heading_1", "heading_2", "heading_3"}
 
 
-def _extract_plain_text(rich_text_array: list) -> str:
+def _extract_plain_text(rich_text_array: list[Any]) -> str:
     return "".join(item.get("plain_text", "") for item in rich_text_array)
 
 
-def collect_blocks(page_id: str, notion_client) -> list[RawBlock]:
+def collect_blocks(page_id: str, notion_client: Any) -> list[RawBlock]:
     blocks: list[RawBlock] = []
     cursor = None
     while True:
-        kwargs: dict = {"block_id": page_id, "page_size": 100}
+        kwargs: dict[str, Any] = {"block_id": page_id, "page_size": 100}
         if cursor:
             kwargs["start_cursor"] = cursor
         response = notion_client.blocks.children.list(**kwargs)
@@ -41,7 +42,7 @@ def collect_blocks(page_id: str, notion_client) -> list[RawBlock]:
     return blocks
 
 
-def collect_comments(page_id: str, notion_client) -> list[str]:
+def collect_comments(page_id: str, notion_client: Any) -> list[str]:
     try:
         response = notion_client.comments.list(block_id=page_id)
         comments: list[str] = []
@@ -55,22 +56,23 @@ def collect_comments(page_id: str, notion_client) -> list[str]:
 
 
 def collect_raw_sessions(
-    session_pages: list[dict],
-    notion_client,
+    session_pages: list[dict[str, Any]],
+    notion_client: Any,
 ) -> list[RawSession]:
     if not session_pages:
         raise ValueError("collect_raw_sessions: session_pages is empty")
     sessions: list[RawSession] = []
     for page in session_pages:
         page_id = page.get("id", "")
-        title_parts = next(
+        title_parts: list[Any] = next(
             (v.get("title", []) for v in page.get("properties", {}).values() if v.get("type") == "title"),
             [],
         )
         name = _extract_plain_text(title_parts) if title_parts else page_id
+        done = bool(page.get("properties", {}).get("Done", {}).get("checkbox", False))
         blocks = collect_blocks(page_id, notion_client)
         comments = collect_comments(page_id, notion_client)
-        sessions.append(RawSession(page_id=page_id, name=name, blocks=blocks, comments=comments))
+        sessions.append(RawSession(page_id=page_id, name=name, blocks=blocks, comments=comments, done=done))
     return sessions
 
 
@@ -146,8 +148,8 @@ def compute_checkbox_analysis(sessions: list[RawSession]) -> ImplicitFeedback:
 
 def assemble_raw_week(
     week_prefix: str,
-    session_pages: list[dict],
-    notion_client,
+    session_pages: list[dict[str, Any]],
+    notion_client: Any,
     planned_plan_markdown: str | None,
 ) -> RawWeekData:
     if not session_pages:
