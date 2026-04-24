@@ -1,7 +1,7 @@
 from weekforge.models.week_summary import (
     ExerciseLogEntry,
     ImplicitFeedback,
-    PainStatus,
+    JointEntry,
     SectionRates,
     WeekSummary,
 )
@@ -30,7 +30,7 @@ ADHERENCE:
         exercise_log=[
             ExerciseLogEntry(name="Squat", planned_weight="110kg", actual_weight=None, planned_sets=3, planned_reps="5", role="main", status="done")
         ],
-        pain_status=PainStatus(si_joint="ok", other=None),
+        pain_status=[JointEntry(name="si_joint", status="ok")],
         implicit_feedback=ImplicitFeedback(
             total_checked=10,
             total_exercises=10,

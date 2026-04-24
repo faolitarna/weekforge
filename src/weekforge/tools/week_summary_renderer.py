@@ -7,7 +7,7 @@ def render_week_summary(summary: WeekSummary) -> str:
     lines.append(f"COMPLETION:{summary.completion}")
     lines.append(f"CONTEXT:{summary.context or ''}")
     lines.append("")
-    
+
     if summary.sessions:
         lines.append("SESSIONS:")
         for s in summary.sessions:
@@ -22,31 +22,36 @@ def render_week_summary(summary: WeekSummary) -> str:
             sets_str = f"{e.planned_sets}->{e.actual_sets}" if e.actual_sets and e.actual_sets != e.planned_sets else str(e.planned_sets)
             reps_str = f"{e.planned_reps}->{e.actual_reps}" if e.actual_reps and e.actual_reps != e.planned_reps else str(e.planned_reps)
             weight_str = f"{e.planned_weight}->{e.actual_weight}" if e.actual_weight and e.actual_weight != e.planned_weight else str(e.planned_weight)
-            
-            p_str = f"{sets_str}x{reps_str} @ {weight_str}"
             feedback_str = f"|\"{e.feedback}\"" if e.feedback else ""
-            lines.append(f"- {e.name}|{e.role}|{e.status}|{p_str}{feedback_str}")
+            lines.append(f"- {e.name}:{weight_str}x{sets_str}x{reps_str}|{e.role}|{e.status}{feedback_str}")
         lines.append("")
-        
+
     if summary.cardio_log:
         lines.append("CARDIO_LOG:")
         for c in summary.cardio_log:
             lines.append(f"- {c.kind}|{c.raw}")
         lines.append("")
-        
+
     if summary.climbing_log:
         lines.append("CLIMBING_LOG:")
-        for c in summary.climbing_log:
-            lines.append(f"- {c.kind}|{c.raw}")
+        for cl in summary.climbing_log:
+            lines.append(f"- {cl.kind}|{cl.raw}")
         lines.append("")
-        
+
+    # Section always emitted — downstream LLM consumers expect the header even when list is empty.
     lines.append("PAIN_STATUS:")
-    if summary.pain_status.si_joint:
-        lines.append(f"- SI Joint: {summary.pain_status.si_joint}")
-    if summary.pain_status.other:
-        lines.append(f"- Other: {summary.pain_status.other}")
+    for j in summary.pain_status:
+        entry = f"- {j.name}:{j.status}"
+        if j.triggers is not None:
+            entry += f"|{j.triggers}"
+            if j.what_helped is not None:
+                entry += f"|{j.what_helped}"
+        elif j.what_helped is not None:
+            # what_helped without triggers — data error, render rather than drop
+            entry += f"|{j.what_helped}"
+        lines.append(entry)
     lines.append("")
-    
+
     lines.append("ISSUES:")
     for i in summary.issues:
         lines.append(f"- {i}")
@@ -63,37 +68,28 @@ def render_week_summary(summary: WeekSummary) -> str:
     lines.append("")
 
     if summary.plan_adherence:
-        lines.append("PLAN_ADHERENCE:")
         p = summary.plan_adherence
-        lines.append(f"- Total: {p.planned_total} (Completed: {p.completed}, Modified: {p.modified}, Skipped: {p.skipped})")
+        lines.append("PLAN_ADHERENCE:")
+        lines.append(f"- planned:{p.planned_total}|completed:{p.completed}|modified:{p.modified}|skipped:{p.skipped}")
         if p.modification_patterns:
-            lines.append("- Modifications:")
-            for m in p.modification_patterns:
-                lines.append(f"  - {m.exercise}: {m.planned} -> {m.actual}")
+            mods = "|".join(f"{m.exercise}->{m.actual}" for m in p.modification_patterns)
+            lines.append(f"- modification_patterns:{mods}")
         if p.skip_patterns:
-            lines.append("- Skips:")
-            for s in p.skip_patterns:
-                lines.append(f"  - {s.exercise}: {s.reason}")
+            skips = "|".join(f"{s.exercise}:{s.reason}" for s in p.skip_patterns)
+            lines.append(f"- skip_patterns:{skips}")
         lines.append("")
 
+    fb = summary.implicit_feedback
+    total = fb.total_exercises
+    pct = round(fb.total_checked / total * 100) if total > 0 else 0
+    sr = fb.section_rates
     lines.append("IMPLICIT_FEEDBACK:")
-    lines.append(f"- Total Checked: {summary.implicit_feedback.total_checked}/{summary.implicit_feedback.total_exercises}")
-    for ps in summary.implicit_feedback.per_session:
-        lines.append(f"- Session {ps.session_name}: {ps.checked}/{ps.total}")
-    lines.append("- Section Completion:")
-    sr = summary.implicit_feedback.section_rates
-    lines.append(f"  - Warmup: {sr.warmup_pct * 100:.0f}%")
-    lines.append(f"  - Main: {sr.main_pct * 100:.0f}%")
-    lines.append(f"  - Cooldown: {sr.cooldown_pct * 100:.0f}%")
-    if summary.implicit_feedback.frequently_skipped:
-        lines.append("- Frequently Skipped:")
-        for fs in summary.implicit_feedback.frequently_skipped:
-            lines.append(f"  - {fs.exercise}: {fs.skip_rate * 100:.0f}%")
-    if summary.implicit_feedback.always_completed:
-        lines.append("- Always Completed:")
-        for ac in summary.implicit_feedback.always_completed:
-            lines.append(f"  - {ac}")
+    lines.append(f"- checkbox_completion:{fb.total_checked}/{total}|{pct}%")
+    lines.append(f"- section_rates:warmup:{sr.warmup_pct * 100:.0f}%|main:{sr.main_pct * 100:.0f}%|cooldown:{sr.cooldown_pct * 100:.0f}%")
+    if fb.frequently_skipped:
+        parts = "|".join(f"{fs.exercise}:{fs.skip_rate * 100:.0f}%" for fs in fb.frequently_skipped)
+        lines.append(f"- frequently_skipped:{parts}")
+    if fb.always_completed:
+        lines.append(f"- always_completed:{'|'.join(fb.always_completed)}")
 
-    # Remove trailing blank line if exists
-    ret = "\n".join(lines).strip()
-    return ret
+    return "\n".join(lines).strip()

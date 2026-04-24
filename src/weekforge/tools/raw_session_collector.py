@@ -63,8 +63,10 @@ def collect_raw_sessions(
     sessions: list[RawSession] = []
     for page in session_pages:
         page_id = page.get("id", "")
-        title_prop = page.get("properties", {}).get("Name", {})
-        title_parts = title_prop.get("title", [])
+        title_parts = next(
+            (v.get("title", []) for v in page.get("properties", {}).values() if v.get("type") == "title"),
+            [],
+        )
         name = _extract_plain_text(title_parts) if title_parts else page_id
         blocks = collect_blocks(page_id, notion_client)
         comments = collect_comments(page_id, notion_client)
@@ -127,9 +129,9 @@ def compute_checkbox_analysis(sessions: list[RawSession]) -> ImplicitFeedback:
         c = stats["checked"]
         skip_count = t - c
         skip_rate = skip_count / t if t else 0.0
-        if skip_rate > 0.5:
+        if t >= 2 and skip_rate > 0.5:
             frequently_skipped.append(SkippedPattern(exercise=exercise, skip_rate=round(skip_rate, 4)))
-        if skip_count == 0 and t > 0:
+        if t >= 2 and skip_count == 0:
             always_completed.append(exercise)
 
     return ImplicitFeedback(

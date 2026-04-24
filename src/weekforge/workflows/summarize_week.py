@@ -86,7 +86,7 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
             import json
 
             from weekforge.models.raw_week_data import RawBlock, RawSession
-            from weekforge.models.week_summary import PainStatus, SessionLine
+            from weekforge.models.week_summary import SessionLine
             from weekforge.tools.raw_session_collector import compute_checkbox_analysis
 
             _logger.info("Building tier0 summary for %s", state.week_prefix)
@@ -112,13 +112,15 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
                 total = sum(1 for b in blocks if b["block_type"] == "to_do")
                 done = sum(1 for b in blocks if b["block_type"] == "to_do" and b["checked"])
                 status = "done" if total > 0 and done == total else ("partial" if done > 0 else "skip")
+                raw_comments = s_data.get("comments", [])
+                comment_text = " | ".join(raw_comments) if raw_comments else ""
                 session_lines.append(SessionLine(
                     name=s_data["name"],
                     status=status,
                     exercises_done=done,
                     exercises_total=total,
                     pain_status=None,
-                    comment="",
+                    comment=comment_text,
                 ))
 
             completion_pct = round(implicit_fb.total_checked / max(implicit_fb.total_exercises, 1) * 100)
@@ -127,7 +129,7 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
                 completion=f"{completion_pct}% ({implicit_fb.total_checked}/{implicit_fb.total_exercises})",
                 sessions=session_lines,
                 exercise_log=[],
-                pain_status=PainStatus(si_joint=None, other=None),
+                pain_status=[],
                 implicit_feedback=implicit_fb,
             )
             _console.print(f"[green]Tier-0 summary: {state.tier0_summary.completion}[/green]")

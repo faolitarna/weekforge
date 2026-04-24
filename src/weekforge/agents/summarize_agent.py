@@ -25,11 +25,12 @@ You are generating a weekly training summary. The user has already provided:
 
 Your job is to fill the narrative fields of the WeekSummary output:
 - `context`: external factors mentioned in comments (illness, travel, equipment limits).
-- `issues`: what didn't work or needs changing (synthesize from comments + skip patterns).
-- `wins`: what worked well (synthesize from completion + positive comments).
+- `issues`: what didn't work or needs changing (synthesize from comments + skip patterns). Each item must be `"key:details"` format (e.g. `"knee_load:squats aggravated mid-session"`).
+- `wins`: what worked well (synthesize from completion + positive comments). Each item must be `"key:details"` format (e.g. `"overhead_strength:elevator press at 14kg steady"`).
 - `recommendations_next`: concrete, coach-voiced suggestions for next week.
 - `highlights`: 3–5 bullets for quick user review in the accept panel.
 - `trend`: one sentence capturing week-over-week direction.
+- `pain_status`: list of JointEntry for each joint with a notable status. Each entry: `name` (joint identifier, e.g. `"si_joint"`), `status` (e.g. `"ok"`, `"stiff"`, `"sore"`), optional `triggers` (what provoked symptoms), optional `what_helped`. Omit entries for joints with no data.
 
 Do NOT recompute or modify deterministic fields (`sessions`, `exercise_log`, `implicit_feedback`,
 `plan_adherence`, etc.). Copy them through unchanged from the input.

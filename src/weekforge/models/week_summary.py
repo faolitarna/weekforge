@@ -39,9 +39,11 @@ class ClimbingEntry(BaseModel):
     raw: str
 
 
-class PainStatus(BaseModel):
-    si_joint: str | None
-    other: str | None
+class JointEntry(BaseModel):
+    name: str
+    status: str
+    triggers: str | None = None
+    what_helped: str | None = None
 
 
 class SectionRates(BaseModel):
@@ -98,7 +100,7 @@ class WeekSummary(BaseModel):
     exercise_log: list[ExerciseLogEntry]
     cardio_log: list[CardioEntry] = Field(default_factory=list)
     climbing_log: list[ClimbingEntry] = Field(default_factory=list)
-    pain_status: PainStatus
+    pain_status: list[JointEntry]
     issues: list[str] = Field(default_factory=list)
     wins: list[str] = Field(default_factory=list)
     recommendations_next: list[str] = Field(default_factory=list)

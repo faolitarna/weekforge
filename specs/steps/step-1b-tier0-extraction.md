@@ -7,6 +7,9 @@
 **Deviations from draft:**
 - `ImplicitFeedback.per_session` is `list[SessionCheckCount]` (Pydantic model with `name`/`checked`/`total`), not `list[tuple[str, int, int]]`. Named fields survive schema evolution; tuples don't.
 - `PlanAdherence.modification_patterns` is `list[ModificationPattern]` (`exercise`/`planned`/`actual`); `PlanAdherence.skip_patterns` is `list[SkipPattern]` (`exercise`/`reason`). Same reasoning.
+- `PainStatus` class replaced by `JointEntry` (step-1e). `WeekSummary.pain_status` is `list[JointEntry]`. See DEC-010.
+- `collect_raw_sessions` title extraction scans all properties for `type == "title"` instead of hardcoding `"Name"`. Fallback to `page_id` if no title property found. Fixes UUID session names when Notion DB uses a different property name.
+- `compute_checkbox_analysis` requires `t >= 2` appearances before an exercise enters `frequently_skipped` or `always_completed`. Single-session exercises (especially from fully-skipped sessions) were generating noise lists of 70+ items.
 
 ## Goal
 
@@ -82,9 +85,11 @@ class ClimbingEntry(BaseModel):
     kind: str
     raw: str
 
-class PainStatus(BaseModel):
-    si_joint: str | None
-    other: str | None
+class JointEntry(BaseModel):
+    name: str           # e.g. "si_joint", "other"
+    status: str         # always present
+    triggers: str | None = None
+    what_helped: str | None = None
 
 class SectionRates(BaseModel):
     warmup_pct: float
@@ -133,7 +138,7 @@ class WeekSummary(BaseModel):
     exercise_log: list[ExerciseLogEntry]
     cardio_log: list[CardioEntry] = Field(default_factory=list)
     climbing_log: list[ClimbingEntry] = Field(default_factory=list)
-    pain_status: PainStatus
+    pain_status: list[JointEntry]
     issues: list[str] = Field(default_factory=list)
     wins: list[str] = Field(default_factory=list)
     recommendations_next: list[str] = Field(default_factory=list)

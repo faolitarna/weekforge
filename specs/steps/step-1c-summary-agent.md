@@ -7,6 +7,8 @@
 **Deviations / open follow-ups:**
 - `overwrite_check` step is a **pass-through placeholder** (`workflows/summarize_week.py`). The prompt described in 1a/1c Specification is not wired yet — fix before multi-week re-runs are safe.
 - Workflow state model (`SummarizeWeekState`) gained extra fields owned by step-1d: `is_bootstrap`, `plan_state_raw`, `plan_state_page_id`, `written_page_id`, plus step literals `plan_state_check`, `plan_state_update`, `done`. Listed here so schema migrations stay traceable to a single source.
+- `tier0_extract` now populates `SessionLine.comment` from raw Notion comments (`s_data["comments"]` joined with ` | `). Comments flow into `tier0_summary_json` → LLM context via `_inject_tier0_facts`. Previously `comment=""` was hardcoded and the LLM had no access to user-written feedback. See DEC-011.
+- `_BASE_TASK_INSTRUCTIONS` updated (step-1e): `issues`/`wins` items instructed as `"key:details"` format; `pain_status` field described as `list[JointEntry]` with field semantics.
 - Test gaps (tracked, not blocking):
   - `tests/agents/test_prompt_composer.py` covers only legacy `compose_system_prompt`, not the new `compose_static_instructions`.
 
