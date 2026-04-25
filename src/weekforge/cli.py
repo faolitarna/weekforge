@@ -4,7 +4,6 @@ Commands are thin wrappers: construct a CheckpointStore, delegate to the workflo
 function, handle KeyboardInterrupt by printing a resume hint. All rendering and
 HITL logic lives in the workflow and hitl modules.
 """
-import uuid
 from collections.abc import Callable
 
 import typer
@@ -85,22 +84,6 @@ def main(ctx: typer.Context) -> None:
 
 
 @app.command()
-def e2e(
-    database_id: str | None = typer.Option(None, help="Notion Database ID. Falls back to NOTION_TEST_DB_ID env var."),
-    thread_id: str | None = typer.Option(None, help="Thread ID to resume. Omit to start a new run."),
-) -> None:
-    """Run the Phase-0 end-to-end validation workflow (transitional)."""
-    from weekforge.config.env import settings
-    from weekforge.workflows.e2e import run_e2e
-
-    store = _make_store()
-    db_id = database_id or settings.notion_test_db_id
-    tid = thread_id or str(uuid.uuid4())
-
-    _run_or_pause(tid, lambda: run_e2e(database_id=db_id, thread_id=tid, store=store))
-
-
-@app.command()
 def plan() -> None:
     """Start or resume the planning lifecycle (not yet implemented)."""
     console.print("[dim]Not yet implemented (step 2).[/dim]")
@@ -128,12 +111,6 @@ def resume(
     if rec is None:
         console.print(f"[red]No checkpoint found for thread-id {thread_id}[/red]")
         raise typer.Exit(code=1)
-
-    if rec.workflow == "e2e":
-        from weekforge.workflows.e2e import run_e2e
-
-        _run_or_pause(thread_id, lambda: run_e2e(database_id=None, thread_id=thread_id, store=store))
-        return
 
     if rec.workflow in ("summarize_week", "extraction"):  # "extraction" is the legacy workflow name stored in old checkpoints
         from weekforge.workflows.summarize_week import run_summarize
