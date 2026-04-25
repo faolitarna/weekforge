@@ -1,7 +1,7 @@
 # Step 1f: Exercise Log Extraction & Context Completion
 
 ## Status
-ready
+done
 
 ## Goal
 - Populate `exercise_log`, `cardio_log`, `climbing_log` in the generated `WeekSummary` by passing raw session block data to `summarize_agent`.
@@ -178,23 +178,23 @@ In `_BASE_TASK_INSTRUCTIONS`:
 - Step reorder breaks in-flight checkpoints with `step="agent"` → skips `plan_state_check` on that resume run; acceptable, clean runs work correctly
 
 ## Acceptance criteria
-- [ ] `feedback-interpretation.md` exists in `src/weekforge/prompts/`
-- [ ] `Prompt.FEEDBACK_INTERPRETATION` in `loader.py`
-- [ ] `compose_static_instructions` includes feedback-interpretation section
-- [ ] `SummarizeWeekState.planned_plan_markdown: str | None = None`
-- [ ] `load_context` reads Plan property from `training_week_summaries` row and stores in state
-- [ ] `tier0_extract` COMPLETION = `"{done}/{total}"` session-based
-- [ ] `plan_state_check` runs before `agent` in step sequence
-- [ ] `SummarizeDeps` has `raw_sessions_json`, `planned_plan_markdown`, `plan_state_raw`
-- [ ] `_inject_raw_sessions`, `_inject_planned_sessions`, `_inject_plan_state` all exist as `@summarize_agent.instructions`
-- [ ] `_inject_raw_sessions` emits heading + to_do blocks only
-- [ ] `_BASE_TASK_INSTRUCTIONS` tasks include `exercise_log`, `cardio_log`, `climbing_log`, `plan_adherence`
-- [ ] `exercise_log`, `cardio_log`, `climbing_log`, `plan_adherence` removed from "do not touch"
-- [ ] Role classification rules (focus exercise list + section fallback) in prompt
-- [ ] Progression annotation instruction in prompt
-- [ ] plan_adherence instruction (fill when plan present, None when absent) in prompt
-- [ ] Manual run: `WeekSummary.exercise_log` non-empty; `COMPLETION` is session ratio
-- [ ] `uv run pytest tests/` passes
+- [x] `feedback-interpretation.md` exists in `src/weekforge/prompts/`
+- [x] `Prompt.FEEDBACK_INTERPRETATION` in `loader.py`
+- [x] `compose_static_instructions` includes feedback-interpretation section
+- [x] `SummarizeWeekState.planned_plan_markdown: str | None = None`
+- [x] `load_context` reads Plan property from `training_week_summaries` row and stores in state
+- [x] `tier0_extract` COMPLETION = `"{done}/{total}"` session-based
+- [x] `plan_state_check` runs before `agent` in step sequence
+- [x] `SummarizeDeps` has `raw_sessions_json`, `planned_plan_markdown`, `plan_state_raw`
+- [x] `_inject_raw_sessions`, `_inject_planned_sessions`, `_inject_plan_state` all exist as `@summarize_week_agent.instructions`
+- [x] `_inject_raw_sessions` emits heading + to_do blocks only
+- [x] Task instructions include `exercise_log`, `cardio_log`, `climbing_log`, `plan_adherence`
+- [x] `exercise_log`, `cardio_log`, `climbing_log`, `plan_adherence` removed from "do not touch"
+- [x] Role classification rules (focus exercise list + section fallback) in prompt
+- [x] Progression annotation instruction in prompt
+- [x] plan_adherence instruction (fill when plan present, None when absent) in prompt
+- [x] Manual run: `WeekSummary.exercise_log` non-empty; `COMPLETION` is session ratio
+- [x] `uv run pytest tests/` passes
 
 ## Out of scope
 - `STRENGTH_LOG` separate section name — canonical format uses `EXERCISE_LOG`

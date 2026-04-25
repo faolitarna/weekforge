@@ -19,8 +19,8 @@ Weekforge migrates legacy declarative text-based recipes (used manually with Cla
 | Task Class | Maps to | Purpose | Default |
 |-----------|---------|---------|---------|
 | `deterministic` | Tier 0 | Pure Python, no LLM | N/A |
-| `fast` | Tier 1 | Routing, classification | `gpt-5.4-nano` |
-| `reasoning` | Tier 2 | Planning, generation, synthesis | `gpt-5.4` |
+| `fast` | Tier 1 | Routing, classification, extraction | `gpt-5.4-mini` |
+| `reasoning` | Tier 2 | Planning, generation, trend synthesis | `gpt-5.4-medium` |
 
 Agent and workflow code references task classes (`fast`, `reasoning`), never specific model names. Swapping model = changing one config entry.
 
@@ -38,12 +38,14 @@ class LLMProfile:
 
 
 LLM_PROFILES: dict[str, LLMProfile] = {
-    "gpt-5.4-nano": LLMProfile(provider="openai", model="gpt-5.4-nano", temperature=0.1),
-    "gpt-5.4":      LLMProfile(provider="openai", model="gpt-5.4", reasoning_effort="medium"),
+    "gpt-5.4-nano":   LLMProfile(provider="openai", model="gpt-5.4-nano", temperature=0.1),
+    "gpt-5.4-mini":   LLMProfile(provider="openai", model="gpt-5.4-mini", temperature=0.1),
+    "gpt-5.4-medium": LLMProfile(provider="openai", model="gpt-5.4", reasoning_effort="medium"),
+    "gpt-5.4-low":    LLMProfile(provider="openai", model="gpt-5.4", reasoning_effort="low"),
 }
 ```
 
-Profile keys are OpenAI model IDs — no separate naming layer until multiple tunings of same model needed. `temperature` and `reasoning_effort` mutually exclusive per model family (reasoning models like `gpt-5.4` ignore `temperature`; non-reasoning models don't take `reasoning_effort`).
+Profile keys use `{model}-{variant}` naming. `temperature` and `reasoning_effort` mutually exclusive per model family (reasoning models like `gpt-5.4` ignore `temperature`; non-reasoning models don't take `reasoning_effort`). Multiple effort levels for same model supported (e.g. `gpt-5.4-medium` vs `gpt-5.4-low`).
 
 Task classes resolve to `LLMProfile` via `resolve_llm_profile("reasoning")`. Agents instantiated with `Agent(model=f"{spec.provider}:{spec.model}", model_settings=...)`, wiring only non-`None` fields into `model_settings` (see [step-0c](../steps/step-0c-llm-integration.md) for full pattern).
 
