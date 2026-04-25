@@ -5,9 +5,9 @@ These are example signals -- the user may phrase feedback differently. Interpret
 
 | Feedback Signal | Response |
 |-----------------|----------|
-| "Felt too easy" | Skip one volume step, or increase load directly if within 1 step of volume ceiling. Accelerated progression. See `progression-protocol.md`. |
+| "Felt too easy" | Skip one volume step, or increase load directly if within 1 step of volume ceiling. Accelerated progression. Step sizes in progression-protocol. |
 | "Felt hard but completed" | Apply next volume step next occurrence. Hard is expected at the edge of capacity — this means the current load is working. |
-| "Completed, no explicit feedback" | Apply next volume step. **Default: push.** Silence after completion = green light. See `progression-protocol.md`. |
+| "Completed, no explicit feedback" | Apply next volume step per guardrails default-push rule. Silence after completion = green light. |
 | "Couldn't complete all sets/reps" | Reduce load 10% or drop 1 set |
 | "Joint discomfort during/after" | Switch to flare-safe variant immediately, monitor |
 | "Skipped multiple sessions" | Reduce session count, investigate barriers |
@@ -21,7 +21,7 @@ Patterns the coach should detect from session data without explicit user stateme
 - **Checkbox completion < 70%** -- session may be too long, too complex, or motivation is low; investigate before adding volume
 - **Cool-down consistently skipped** -- session duration likely too long; shorten main work or integrate mobility into warm-up
 - **Same exercise skipped across multiple sessions** -- user may dislike it, find it painful, or lack equipment; ask or substitute
-- **Weights unchanged for 3+ weeks with no feedback** -- stall or under-programming. Increase load and reset volume (see `progression-protocol.md`). Don't wait for permission — force the progression and let feedback correct.
+- **Weights unchanged for 3+ weeks with no feedback** -- stall or under-programming. Increase load and reset volume per progression-protocol ladder. Don't wait for permission — force the progression and let feedback correct.
 - **Session type consistently skipped** (e.g., all conditioning sessions) -- barrier exists (boredom, time, environment); redesign format or reduce frequency
 - **All sessions completed with no comments** -- either everything is working or user isn't engaging with feedback; prompt a brief check-in
 - **Rapid weight jumps between weeks** -- possible form breakdown; flag and suggest recording a set or reducing to previous weight with more volume
@@ -30,7 +30,7 @@ Patterns the coach should detect from session data without explicit user stateme
 <combined-signals>
 When multiple signals appear simultaneously, use this priority order to resolve conflicts.
 
-1. **Pain + any other signal** -- pain always wins. Apply flare-safe substitutions first, then address the secondary signal after pain is resolved. Never increase load or volume when pain is present, even if user says "felt easy."
+1. **Pain + any other signal** -- guardrails pain-override applies first. Address the secondary signal only after pain is resolved.
 2. **Low adherence + "too hard"** -- reduce both session count and per-session difficulty. This combination suggests the program exceeds current capacity. Drop to minimum viable sessions and rebuild.
 3. **Low adherence + "too easy"** -- the barrier is not difficulty. Investigate scheduling, session length, or format issues (executive function, environment). Maintain or slightly reduce session count but keep intensity.
 4. **"Felt easy" + incomplete sets** -- contradictory signal. User may be rating perceived effort rather than actual performance. Trust the completion data over subjective report; maintain current parameters and ask for clarification.

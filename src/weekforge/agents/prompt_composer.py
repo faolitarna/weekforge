@@ -20,6 +20,8 @@ def compose_static_instructions(caveman_mode: bool) -> str:
         "## Coaching Persona\n\n" + load_prompt(Prompt.COACHING_PERSONA),
         "## Safety Guardrails\n\n" + load_prompt(Prompt.COACHING_GUARDRAILS),
         "## Feedback Interpretation\n\n" + load_prompt(Prompt.FEEDBACK_INTERPRETATION),
+        "## Progression Protocol\n\n" + load_prompt(Prompt.PROGRESSION_PROTOCOL),
+        "## Task Instructions\n\n" + load_prompt(Prompt.SUMMARIZE_WEEK_TASK),
     ]
     if caveman_mode:
         sections.append(CAVEMAN_LITE_DIRECTIVE)

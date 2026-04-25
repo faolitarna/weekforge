@@ -7,6 +7,8 @@ class Prompt(StrEnum):
     COACHING_PERSONA = "coaching_persona.md"
     COACHING_GUARDRAILS = "coaching_guardrails.md"
     FEEDBACK_INTERPRETATION = "feedback-interpretation.md"
+    SUMMARIZE_WEEK_TASK = "summarize-week-task.md"
+    PROGRESSION_PROTOCOL = "progression-protocol.md"
 
 
 @functools.cache

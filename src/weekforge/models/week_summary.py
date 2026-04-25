@@ -18,6 +18,7 @@ class ExerciseLogEntry(BaseModel):
     status: Status
     feedback: str | None = None
     section: str | None = None
+    session_name: str | None = None
 
 
 class SessionLine(BaseModel):
