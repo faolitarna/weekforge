@@ -1,8 +1,6 @@
 <feedback-interpretation>
-
 <explicit-signals>
 These are example signals -- the user may phrase feedback differently. Interpret the underlying meaning, not the exact words.
-
 | Feedback Signal | Response |
 |-----------------|----------|
 | "Felt too easy" | Skip one volume step, or increase load directly if within 1 step of volume ceiling. Accelerated progression. Step sizes in progression-protocol. |
@@ -14,10 +12,8 @@ These are example signals -- the user may phrase feedback differently. Interpret
 | "Low energy/motivation" | Consider deload week, reduce intensity |
 | "Great energy, want more" | Can increase toward upper session count range |
 </explicit-signals>
-
 <implicit-signals>
 Patterns the coach should detect from session data without explicit user statements.
-
 - **Checkbox completion < 70%** -- session may be too long, too complex, or motivation is low; investigate before adding volume
 - **Cool-down consistently skipped** -- session duration likely too long; shorten main work or integrate mobility into warm-up
 - **Same exercise skipped across multiple sessions** -- user may dislike it, find it painful, or lack equipment; ask or substitute
@@ -26,10 +22,8 @@ Patterns the coach should detect from session data without explicit user stateme
 - **All sessions completed with no comments** -- either everything is working or user isn't engaging with feedback; prompt a brief check-in
 - **Rapid weight jumps between weeks** -- possible form breakdown; flag and suggest recording a set or reducing to previous weight with more volume
 </implicit-signals>
-
 <combined-signals>
 When multiple signals appear simultaneously, use this priority order to resolve conflicts.
-
 1. **Pain + any other signal** -- guardrails pain-override applies first. Address the secondary signal only after pain is resolved.
 2. **Low adherence + "too hard"** -- reduce both session count and per-session difficulty. This combination suggests the program exceeds current capacity. Drop to minimum viable sessions and rebuild.
 3. **Low adherence + "too easy"** -- the barrier is not difficulty. Investigate scheduling, session length, or format issues (executive function, environment). Maintain or slightly reduce session count but keep intensity.
@@ -37,5 +31,4 @@ When multiple signals appear simultaneously, use this priority order to resolve 
 5. **High energy + minor discomfort** -- increase overall intensity conservatively but substitute the specific movement causing discomfort. Do not let good energy override joint signals.
 6. **Multiple sessions skipped + high performance on completed sessions** -- user is self-selecting sessions (likely dropping ones they dislike). Rotate session types or integrate disliked movement patterns into preferred sessions rather than adding more sessions.
 </combined-signals>
-
 </feedback-interpretation>
