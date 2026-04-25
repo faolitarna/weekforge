@@ -8,7 +8,9 @@ class Prompt(StrEnum):
     COACHING_GUARDRAILS = "coaching_guardrails.md"
     FEEDBACK_INTERPRETATION = "feedback-interpretation.md"
     SUMMARIZE_WEEK_TASK = "summarize-week-task.md"
+    UPDATE_PLAN_STATE_TASK = "update-plan-state-task.md"
     PROGRESSION_PROTOCOL = "progression-protocol.md"
+    CAVEMAN_LITE_DIRECTIVE = "caveman-lite-directive.md"
 
 
 @functools.cache

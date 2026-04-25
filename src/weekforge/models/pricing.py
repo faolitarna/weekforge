@@ -6,6 +6,7 @@ logger = logging.getLogger(__name__)
 # (input_usd_per_mtok, output_usd_per_mtok)
 PRICING: dict[str, tuple[float, float]] = {
     "gpt-5.4":      (2.50, 15.00),
+    "gpt-5.4-mini": (0.75,  4.50),
     "gpt-5.4-nano": (0.20,  1.25),
 }
 USD_TO_EUR: float = 0.92

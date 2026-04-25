@@ -18,10 +18,20 @@ LLM_PROFILES: dict[str, LLMProfile] = {
         model="gpt-5.4-nano",
         temperature=0.1,
     ),
-    "gpt-5.4": LLMProfile(
+    "gpt-5.4-mini": LLMProfile(
+        provider="openai",
+        model="gpt-5.4-mini",
+        temperature=0.1,
+    ),
+    "gpt-5.4-medium": LLMProfile(
         provider="openai",
         model="gpt-5.4",
         reasoning_effort="medium",
+    ),
+    "gpt-5.4-low": LLMProfile(
+        provider="openai",
+        model="gpt-5.4",
+        reasoning_effort="low",
     ),
 }
 

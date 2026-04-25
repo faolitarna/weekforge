@@ -9,9 +9,10 @@ class Settings(BaseSettings):
     notion_db_training_week_summaries: str
     notion_db_training_templates: str
     notion_user_profile_page_id: str
-    fast_profile: str = "gpt-5.4-nano"
-    reasoning_profile: str = "gpt-5.4"
+    fast_profile: str = "gpt-5.4-mini"
+    reasoning_profile: str = "gpt-5.4-medium"
     caveman_mode: bool = False
+    verbose: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",

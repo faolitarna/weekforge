@@ -1,13 +1,13 @@
 import json
 from unittest.mock import MagicMock, patch
 
-from weekforge.agents.summarize_agent import SummarizeDeps, summarize_agent
+from weekforge.agents.summarize_week_agent import SummarizeDeps, summarize_week_agent
 from weekforge.models.user_profile import UserProfile
 from weekforge.models.week_summary import ImplicitFeedback, SectionRates, SessionLine, WeekSummary
 
 
-@patch("weekforge.agents.summarize_agent.summarize_agent.run_sync")
-def test_summarize_agent(mock_run):
+@patch("weekforge.agents.summarize_week_agent.summarize_week_agent.run_sync")
+def test_summarize_week_agent(mock_run):
     mock_run.return_value = MagicMock(data=WeekSummary.model_construct(
         highlights=["Test highlight"],
         trend="flat"
@@ -28,7 +28,7 @@ def test_summarize_agent(mock_run):
         planned_plan_markdown=None,
         plan_state_raw=None,
     )
-    result = summarize_agent.run_sync("test", deps=deps)
+    result = summarize_week_agent.run_sync("test", deps=deps)
     assert isinstance(result.data, WeekSummary)
     assert result.data.highlights == ["Test highlight"]
     assert result.data.trend == "flat"

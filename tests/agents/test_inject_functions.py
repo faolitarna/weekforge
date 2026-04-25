@@ -1,7 +1,7 @@
 import json
 from unittest.mock import MagicMock
 
-from weekforge.agents.summarize_agent import (
+from weekforge.agents.summarize_week_agent import (
     SummarizeDeps,
     _inject_plan_state,
     _inject_planned_sessions,
