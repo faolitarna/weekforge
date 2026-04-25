@@ -55,8 +55,8 @@ Your job is to fill:
 - `trend`: one sentence capturing week-over-week direction.
 - `pain_status`: list of JointEntry for each joint with a notable status. Each entry: `name` (joint identifier, e.g. `"si_joint"`), `status` (e.g. `"ok"`, `"stiff"`, `"sore"`), optional `triggers` (what provoked symptoms), optional `what_helped`. Omit entries for joints with no data.
 
-Do NOT recompute or modify deterministic fields (`sessions`, `implicit_feedback`).
-Copy them through unchanged from the input.
+Do NOT recompute or modify `sessions` or `implicit_feedback` — copy them through from Tier-0 unchanged.
+All other fields listed above are yours to fill from Raw Session Blocks, comments, Planned Sessions, and PLAN_STATE.
 """
 
 _model, _model_settings = build_openai_model(resolve_llm_profile("reasoning"))

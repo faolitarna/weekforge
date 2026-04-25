@@ -18,7 +18,8 @@ Step 1 is split into four sub-steps so each can be implemented independently by 
 | 1b | [Tier-0 Extraction](./step-1b-tier0-extraction.md) | Thin Tier-0: block/comment collection + checkbox arithmetic. Pydantic `WeekSummary` contract. | ✅ |
 | 1c | [Summary Agent & Workflow](./step-1c-summary-agent.md) | `summarize_agent` (Pydantic AI), `summarize_week.py` workflow, single HITL acceptance gate with feedback loop | ✅ |
 | 1d | [Notion Write & PLAN_STATE](./step-1d-notion-write-and-plan-state.md) | `WeekSummary` → legacy text renderer, Notion write, PLAN_STATE incremental/bootstrap | ✅ |
-| 1e | [Summary Format Alignment](./step-1e-summary-formatting.md) | Align renderer to source-material `<summary-format>` — pipe-delimited, token-optimized for LLM consumption | 🔲 |
+| 1e | [Summary Format Alignment](./step-1e-summary-formatting.md) | Align renderer to source-material `<summary-format>` — pipe-delimited, token-optimized for LLM consumption | ✅ |
+| 1f | [Exercise Log Extraction](./step-1f-exercise-log-extraction.md) | Pass raw session blocks + PLAN_STATE to summary agent; populate exercise_log, cardio_log, climbing_log; reorder plan_state_check before agent | 🔲 |
 
 ## Implementation Status
 

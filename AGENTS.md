@@ -1,68 +1,102 @@
-# 🤖 Project Agents
+# Project Agents
 
-This repository utilizes "development agents" to assist with coding, reviewing, and architecting tasks. Agents define specific **personas** for the AI coding assistant to adopt. For reusable **procedural knowledge** (how to do something, not who to be), see [SKILLS.md](./SKILLS.md).
+Shared repo rules.
+Keep agent files short.
+Do not repeat this file inside agents.
 
-## Available Agents
+## Repo rules
 
-The definitions for these agents are located in the `.agents/agents/` directory.
+- Plain Python for workflow orchestration.
+- Tier 0 = deterministic Python.
+- If task can be done without LLM, do it in Python.
+- LLMs do interpretive work, not parsing, counting, CRUD, formatting, or validation.
+- Notion access stays inside tool layer.
+- Workflow state must support checkpoint/resume.
+- Replay-sensitive writes must be idempotent.
+- CLI output stays scannable.
 
-### Specs Developer
-- **Path**: `.agents/agents/specs-developer/specs-developer.md`
-- **Role**: Specs Developer — System Architect for Agentic Patterns.
-- **Usage**: Use this agent to analyze legacy code and generate formal architectural specs based strictly on theoretical agentic patterns (like Google's Agentic Design Patterns), without writing implementation code.
-- **How to invoke**: *"Adopt the `specs-developer` agent. Read the legacy code in [folder], cross-reference it with `references/agentic-design-patterns-guide.md`, and generate an SDD Spec."*
+## Modeling rules
 
-### Feature Developer
-- **Path**: `.agents/agents/feature-developer/feature-developer.md`
-- **Role**: Senior Python Engineer — LangGraph, Notion API, training domain specialist.
-- **Usage**: Use this agent to implement step specs. Reads the spec, builds bottom-up (models → tools → graph → CLI), narrates every design decision, and self-verifies against acceptance criteria.
-- **How to invoke**: *"Adopt the `feature-developer` agent. Implement step [step-XX] from `specs/steps/step-XX-name.md`."*
+- Use structure when code must branch, validate, persist, retry, compare, or resume.
+- Keep text as text when it is real content: markdown, prompts, comments, summaries, recommendations, highlights.
+- Prefer typed envelopes around free-text payloads.
+- If code parses a string later, that string is a protocol. Keep one parser, one renderer, brief format docs, tests.
 
-### Feature Tester
-- **Path**: `.agents/agents/feature-tester/feature-tester.md`
-- **Role**: QA Engineer — pytest specialist, pragmatic test strategist.
-- **Usage**: Use this agent to review an implementation and write focused, high-value tests. Always reasons about whether each test justifies its existence in a personal project. Keeps the test suite small and sharp.
-- **How to invoke**: *"Adopt the `feature-tester` agent. Review the implementation of step [step-XX] and write tests."*
+## Quality rules
 
-### Code Reviewer
-- **Path**: `.agents/agents/code-reviewer/code-reviewer.md`
-- **Role**: Senior Engineer — pre-commit quality gate for solo trunk-based development.
-- **Usage**: Use this agent before committing. Reviews for spec compliance, architectural consistency, type safety, and testing adequacy. Provides a structured report with blockers/warnings/suggestions and a commit message.
-- **How to invoke**: *"Adopt the `code-reviewer` agent. Review the implementation of step [step-XX] before commit."*
+- Optimize for readability.
+- Keep code small and direct.
+- Avoid speculative abstractions.
+- Avoid framework ceremony.
+- Fail loudly at boundaries.
+- No silent swallowing of meaningful errors.
 
-### Documentation Developer
-- **Path**: `.agents/agents/documentation-developer/documentation-developer.md`
-- **Role**: Senior Technical Writer + Domain Expert — explains code intent for learning.
-- **Usage**: Use this agent to add inline documentation to code. Documents intent and decisions, not fundamentals. Keeps documentation concise and action-oriented.
-- **How to invoke**: *"Adopt the `documentation-developer` agent. Document the implementation of step [step-XX]."*
+## Agent list
 
-## Recommended Workflow
+### `specs-facilitator`
+- Purpose: clarify one spec draft before formal spec writing.
+- Owns: clarification questions, decision capture, open-question tracking, readiness check.
+- Edits only: `Status`, `Goal`, `Decisions`, `Open questions`, `Out of scope`.
+- Does not own: full spec writing, code, tests, review, docs.
 
-The five agents form a natural development cycle for a solo developer:
+### `specs-developer`
+- Purpose: write one bounded implementation spec.
+- Owns: scope, file list, interfaces, data contracts, workflow, tier split, failure modes, acceptance criteria.
+- Reads existing spec draft and its discussion sections.
+- If important ambiguity remains in `Open questions`, stop and hand back to `spec-discuss-facilitator`.
+- Does not guess.
 
-```
-specs-developer → feature-developer → feature-tester → code-reviewer → documentation-developer → commit
-```
+### `feature-developer`
+- Purpose: implement one bounded spec step.
+- Owns: implementation and local validation.
+- Does not own: spec writing, review, broad documentation.
 
-| Phase | Agent | Output |
-|-------|-------|--------|
-| 1. Specify | `specs-developer` | Step spec with acceptance criteria |
-| 2. Build | `feature-developer` | Implementation + accompanying tests |
-| 3. Test | `feature-tester` | Focused test suite + coverage assessment |
-| 4. Review | `code-reviewer` | Structured review report + commit message |
-| 5. Document | `documentation-developer` | Inline docstrings explaining intent |
+### `feature-tester`
+- Purpose: write focused tests for changed behavior.
+- Owns: test plan, unit tests, small justified integration tests, coverage summary.
+- Does not own: implementation review or redesign.
 
-**Git strategy**: Trunk-based development (direct commits to `main`). The code-reviewer agent replaces PR reviews. The documentation-developer agent adds inline docs before commit. Atomic commits with conventional format: `feat(step-0b): implement Notion tool layer`.
+### `code-reviewer`
+- Purpose: review changed scope before commit.
+- Owns: spec compliance, correctness, architectural fit, maintainability, test adequacy.
+- Does not own: rewriting code or inventing requirements.
 
-## Agents vs Skills
+### `documentation-developer`
+- Purpose: add minimal code documentation.
+- Owns: non-obvious contract docs, local why-comments, comment cleanup.
+- Does not own: specs, implementation, tutorials, or review.
 
-| Concept | What it defines | When loaded | Example |
-|---------|----------------|-------------|---------|
-| **Agent** | A *persona* — "You are a Senior Specs Developer" | Explicit invocation | `specs-developer` |
-| **Skill** | *Procedural knowledge* — "When doing X, follow these rules" | On-demand, when task matches | `specs-management` |
+## Workflow
 
-## Guidelines for Adding New Agents
+Default flow:
 
-1. Create a `.md` file in the `.agents/agents/` directory.
-2. Define the persona, core process, and required output.
-3. Document it in this `AGENTS.md` file so everyone on the team knows how to assign it.
+`spec-discuss-facilitator -> specs-developer -> feature-developer -> feature-tester -> code-reviewer -> documentation-developer -> commit`
+
+## Handoff rules
+
+- Start with a spec draft based on `spec-template.md`.
+- If `Open questions` contains meaningful ambiguity, run `spec-discuss-facilitator` first.
+- When ambiguity is low and decisions are captured, run `specs-developer`.
+- `specs-developer` must leave `Open questions` as `None` or explicitly hand the draft back for more discussion.
+- Downstream agents treat the finalized spec as source of truth.
+
+## Spec file rule
+
+Use one spec file as the working document.
+Do not create a separate discussion artifact.
+Discussion happens inside the spec draft.
+
+Recommended top sections in every spec:
+- `Status`
+- `Goal`
+- `Decisions`
+- `Open questions`
+
+## Working style
+
+- Read only needed context.
+- Stay inside requested scope.
+- Prefer smallest correct change.
+- Reuse good local patterns.
+- Avoid unrelated refactors.
+- Be explicit about assumptions and gaps.

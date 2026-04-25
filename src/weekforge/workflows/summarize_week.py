@@ -140,8 +140,7 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
                 week_prefix=state.week_prefix,
                 completion=f"{done_count}/{total_count}",
                 sessions=session_lines,
-                exercise_log=[],  # LLM fills from raw session blocks
-
+                exercise_log=[],
                 pain_status=[],
                 implicit_feedback=implicit_fb,
             )
@@ -165,7 +164,10 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
                 user_profile=profile,
                 implicit_feedback=state.tier0_summary.implicit_feedback,
                 plan_adherence=state.tier0_summary.plan_adherence,
-                tier0_summary_json=state.tier0_summary.model_dump_json(exclude_none=True),
+                tier0_summary_json=state.tier0_summary.model_dump_json(
+                    exclude_none=True,
+                    include={"week_prefix", "completion", "context", "sessions", "implicit_feedback"},
+                ),
                 raw_sessions_json=state.raw_sessions_json or "[]",
                 planned_plan_markdown=state.planned_plan_markdown,
                 plan_state_raw=state.plan_state_raw,
