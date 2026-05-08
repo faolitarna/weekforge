@@ -3,7 +3,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     notion_token: str
-    notion_test_db_id: str
     openai_api_key: str
     notion_db_training_sessions: str
     notion_db_training_week_summaries: str

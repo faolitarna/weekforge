@@ -17,7 +17,11 @@
 | 1d | [Notion Write & PLAN_STATE](./steps/step-1d-notion-write-and-plan-state.md) | Legacy-format renderer, Notion row update, PLAN_STATE incremental/bootstrap | ✅ |
 | 1e | [Summary Format Alignment](./steps/step-1e-summary-formatting.md) | Pipe-delimited renderer, JointEntry pain model, token-optimized format | ✅ |
 | 1f | [Exercise Log Extraction](./steps/step-1f-exercise-log-extraction.md) | Raw sessions → agent, exercise/cardio/climbing logs, plan adherence, step reorder | ✅ |
-| 2 | [Planning](./steps/step-2-planning.md) | `plan_week` with HITL collaborative shaping | ⬜ |
+| 2 | [Planning](./steps/step-2-planning.md) | `plan_week` — index → sub-steps 2a–2d | ⬜ |
+| 2a | [CLI, State, Checkpoint](./steps/step-2a-cli-state-checkpoint.md) | `weekforge plan <week>` Typer command, `PlanWeekState`, workflow skeleton, overwrite-confirm gate | ⬜ |
+| 2b | [Context Loading](./steps/step-2b-context-loading.md) | Tier-0: templates, 3-week feedback, PLAN_STATE, user profile, `active_flare` | ⬜ |
+| 2c | [Planning Agent + HITL](./steps/step-2c-planning-agent-hitl.md) | `plan_week_agent`, `WeekPlan` output, accept/feedback/quit gate | ⬜ |
+| 2d | [Validation & Notion Write](./steps/step-2d-validation-and-write.md) | Tier-0 ratio/conditioning checks + 1-retry, idempotent Plan-property write | ⬜ |
 | 3 | [Generation](./steps/step-3-generation.md) | `draft_session` + Deterministic Evaluator loop | ⬜ |
 | 4 | [Terminal Review](./steps/step-4-terminal-review.md) | `summarize_plan` — mesocycle analysis | ⬜ |
 

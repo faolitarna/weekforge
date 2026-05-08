@@ -1,0 +1,1 @@
+Various commandline tool polishing, hammer animation, cleaner boxes, better messages only when needed. 

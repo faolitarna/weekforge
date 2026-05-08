@@ -253,7 +253,7 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
             code_block = f"```text\n{rendered}\n```"
 
             all_summary_pages = notion.query(database_id=settings.notion_db_training_week_summaries)
-            records = [p for p in all_summary_pages if _get_text_prop(p, "Week") == state.week_prefix]
+            records = [p for p in all_summary_pages if _get_text_prop(p, "Week") == state.week_prefix[1:]]
 
             if records:
                 page_id = records[0]["id"]
@@ -268,8 +268,8 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
                 page_id = notion.create(
                     database_id=settings.notion_db_training_week_summaries,
                     properties={
-                        "Week": {"rich_text": [{"text": {"content": state.week_prefix}}]},
-                        title_prop: {"title": [{"text": {"content": f"Week {state.week_prefix} Summary"}}]},
+                        "Week": {"rich_text": [{"text": {"content": state.week_prefix[1:]}}]},
+                        title_prop: {"title": [{"text": {"content": f"{state.week_prefix} Summary"}}]},
                     },
                     content=code_block
                 )
