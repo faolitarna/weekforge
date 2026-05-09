@@ -4,10 +4,29 @@ Shared repo rules.
 Keep agent files short.
 Do not repeat this file inside agents.
 
+## Agent locations
+
+- Shared agents: `.agents/agents/<name>/<name>.md`
+- Project-specific agents: `.agents-local/agents/<name>/<name>.md`
+- Lookup order: `.agents-local/` first, then `.agents/`. Local wins on collision.
+
+## Tier split
+
+- Tier 0 = deterministic Python (parsing, validation, CRUD, formatting)
+- Tier 1 = deterministic + tool calls (external I/O, Notion, filesystem)
+- Tier 2 = LLM reasoning (interpretation, summarization, recommendation)
+
+## Layer boundaries
+
+- CLI = entry point
+- workflows = orchestration
+- tools = I/O + deterministic logic
+- models = structured data
+- agents = LLM prompt + output contract
+
 ## Repo rules
 
 - Plain Python for workflow orchestration.
-- Tier 0 = deterministic Python.
 - If task can be done without LLM, do it in Python.
 - LLMs do interpretive work, not parsing, counting, CRUD, formatting, or validation.
 - Notion access stays inside tool layer.
@@ -43,7 +62,7 @@ Do not repeat this file inside agents.
 - Purpose: write one bounded implementation spec.
 - Owns: scope, file list, interfaces, data contracts, workflow, tier split, failure modes, acceptance criteria.
 - Reads existing spec draft and its discussion sections.
-- If important ambiguity remains in `Open questions`, stop and hand back to `spec-discuss-facilitator`.
+- If important ambiguity remains in `Open questions`, stop and hand back to `specs-facilitator`.
 - Does not guess.
 
 ### `feature-developer`
@@ -70,12 +89,12 @@ Do not repeat this file inside agents.
 
 Default flow:
 
-`spec-discuss-facilitator -> specs-developer -> feature-developer -> feature-tester -> code-reviewer -> documentation-developer -> commit`
+`specs-facilitator -> specs-developer -> feature-developer -> feature-tester -> code-reviewer -> documentation-developer -> commit`
 
 ## Handoff rules
 
 - Start with a spec draft based on `spec-template.md`.
-- If `Open questions` contains meaningful ambiguity, run `spec-discuss-facilitator` first.
+- If `Open questions` contains meaningful ambiguity, run `specs-facilitator` first.
 - When ambiguity is low and decisions are captured, run `specs-developer`.
 - `specs-developer` must leave `Open questions` as `None` or explicitly hand the draft back for more discussion.
 - Downstream agents treat the finalized spec as source of truth.
