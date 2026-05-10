@@ -6,9 +6,9 @@ Do not repeat this file inside agents.
 
 ## Agent locations
 
-- Shared agents: `.agents/agents/<name>/<name>.md`
-- Project-specific agents: `.agents-local/agents/<name>/<name>.md`
-- Lookup order: `.agents-local/` first, then `.agents/`. Local wins on collision.
+- Shared agents: `.dev-agents/agents/<name>/<name>.md`
+- Project-specific agents: `.agents/agents/<name>/<name>.md`
+- Lookup order: `.agents/` first, then `.dev-agents/`. Local wins on collision.
 
 ## Tier split
 
