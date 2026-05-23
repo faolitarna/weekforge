@@ -7,8 +7,8 @@ Weekforge is an automated training coach that reads workout data from Notion, us
 ### Training structure
 
 **Week**:
-A calendar week (Monday–Sunday) within a mesocycle, identified by a zero-padded prefix like `W01`, `W07`.
-_Avoid_: training block, microcycle
+A training week within a mesocycle, identified by a zero-padded prefix like `W01`, `W07`. Numbered sequentially from the start of the mesocycle — not tied to calendar week numbers. A long mesocycle can have W52+.
+_Avoid_: training block, microcycle, calendar week
 
 **Session**:
 The smallest schedulable training event within a week. Can be a gym workout, run, climb, mobility work, correction work, or active recovery. Rest days are not sessions.
