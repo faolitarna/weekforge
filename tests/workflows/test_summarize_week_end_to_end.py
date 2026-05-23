@@ -59,5 +59,5 @@ def test_extraction_end_to_end(mock_run, mock_query, mock_create, _mock_title, t
     # Check that notion create was called twice
     assert mock_create.call_count == 2
     create_args = mock_create.call_args_list
-    assert create_args[0][1]["properties"]["Week"]["rich_text"][0]["text"]["content"] == "W01"
+    assert create_args[0][1]["properties"]["Week"]["rich_text"][0]["text"]["content"] == "01"
     assert "PLAN_STATE" in create_args[1][1]["properties"]["Week"]["rich_text"][0]["text"]["content"]

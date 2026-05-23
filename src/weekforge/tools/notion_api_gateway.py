@@ -138,6 +138,31 @@ def query(database_id: str, filters: list[dict[str, Any]] | None = None) -> list
     return results
 
 
+def fetch_blocks(page_id: str) -> list[dict[str, Any]]:
+    """Fetch all child blocks for a page, paginated, with retry."""
+    blocks: list[dict[str, Any]] = []
+    has_more = True
+    next_cursor = None
+
+    while has_more:
+        block_args: dict[str, Any] = {"block_id": page_id}
+        if next_cursor:
+            block_args["start_cursor"] = next_cursor
+
+        block_response = _retry_api_call(_client.blocks.children.list, **block_args)
+        blocks.extend(block_response.get("results", []))
+        has_more = block_response.get("has_more", False)
+        next_cursor = block_response.get("next_cursor")
+
+    return blocks
+
+
+def fetch_comments(page_id: str) -> list[dict[str, Any]]:
+    """Fetch all comments on a page, with retry."""
+    response = _retry_api_call(_client.comments.list, block_id=page_id)
+    return list(response.get("results", []))
+
+
 def fetch(page_id: str) -> dict[str, Any]:
     """Fetch a page's properties and full block content.
 
@@ -147,20 +172,7 @@ def fetch(page_id: str) -> dict[str, Any]:
     beyond the top level here.
     """
     page = _retry_api_call(_client.pages.retrieve, page_id=page_id)
-
-    blocks = []
-    has_more = True
-    next_cursor = None
-
-    while has_more:
-        block_args = {"block_id": page_id}
-        if next_cursor:
-            block_args["start_cursor"] = next_cursor
-
-        block_response = _retry_api_call(_client.blocks.children.list, **block_args)
-        blocks.extend(block_response.get("results", []))
-        has_more = block_response.get("has_more", False)
-        next_cursor = block_response.get("next_cursor")
+    blocks = fetch_blocks(page_id)
 
     return {
         "properties": page.get("properties", {}),

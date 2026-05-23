@@ -9,6 +9,7 @@ from weekforge.models.week_summary import (
     SessionCheckCount,
     SkippedPattern,
 )
+from weekforge.tools import notion_api_gateway as notion
 
 logger = logging.getLogger(__name__)
 
@@ -19,37 +20,26 @@ def _extract_plain_text(rich_text_array: list[Any]) -> str:
     return "".join(item.get("plain_text", "") for item in rich_text_array)
 
 
-def collect_blocks(page_id: str, notion_client: Any) -> list[RawBlock]:
-    blocks: list[RawBlock] = []
-    cursor = None
-    while True:
-        kwargs: dict[str, Any] = {"block_id": page_id, "page_size": 100}
-        if cursor:
-            kwargs["start_cursor"] = cursor
-        response = notion_client.blocks.children.list(**kwargs)
-        for block in response.get("results", []):
-            block_type = block.get("type", "unknown")
-            type_data = block.get(block_type, {})
-            rich_text = type_data.get("rich_text", [])
-            text = _extract_plain_text(rich_text)
-            checked: bool | None = None
-            if block_type == "to_do":
-                checked = bool(type_data.get("checked", False))
-            blocks.append(RawBlock(block_type=block_type, text=text, checked=checked, raw=block))
-        if not response.get("has_more"):
-            break
-        cursor = response.get("next_cursor")
-    return blocks
+def _parse_block(block: dict[str, Any]) -> RawBlock:
+    block_type = block.get("type", "unknown")
+    type_data = block.get(block_type, {})
+    rich_text = type_data.get("rich_text", [])
+    text = _extract_plain_text(rich_text)
+    checked: bool | None = None
+    if block_type == "to_do":
+        checked = bool(type_data.get("checked", False))
+    return RawBlock(block_type=block_type, text=text, checked=checked, raw=block)
 
 
-def collect_comments(page_id: str, notion_client: Any) -> list[str]:
+def collect_blocks(page_id: str) -> list[RawBlock]:
+    raw_blocks = notion.fetch_blocks(page_id)
+    return [_parse_block(b) for b in raw_blocks]
+
+
+def collect_comments(page_id: str) -> list[str]:
     try:
-        response = notion_client.comments.list(block_id=page_id)
-        comments: list[str] = []
-        for comment in response.get("results", []):
-            rich_text = comment.get("rich_text", [])
-            comments.append(_extract_plain_text(rich_text))
-        return comments
+        raw_comments = notion.fetch_comments(page_id)
+        return [_extract_plain_text(c.get("rich_text", [])) for c in raw_comments]
     except Exception:
         logger.warning("Failed to fetch comments for page %s — continuing with empty list", page_id)
         return []
@@ -57,7 +47,6 @@ def collect_comments(page_id: str, notion_client: Any) -> list[str]:
 
 def collect_raw_sessions(
     session_pages: list[dict[str, Any]],
-    notion_client: Any,
 ) -> list[RawSession]:
     if not session_pages:
         raise ValueError("collect_raw_sessions: session_pages is empty")
@@ -70,8 +59,8 @@ def collect_raw_sessions(
         )
         name = _extract_plain_text(title_parts) if title_parts else page_id
         done = bool(page.get("properties", {}).get("Done", {}).get("checkbox", False))
-        blocks = collect_blocks(page_id, notion_client)
-        comments = collect_comments(page_id, notion_client)
+        blocks = collect_blocks(page_id)
+        comments = collect_comments(page_id)
         sessions.append(RawSession(page_id=page_id, name=name, blocks=blocks, comments=comments, done=done))
     return sessions
 
@@ -149,12 +138,11 @@ def compute_checkbox_analysis(sessions: list[RawSession]) -> ImplicitFeedback:
 def assemble_raw_week(
     week_prefix: str,
     session_pages: list[dict[str, Any]],
-    notion_client: Any,
     planned_plan_markdown: str | None,
 ) -> RawWeekData:
     if not session_pages:
         raise ValueError(f"{week_prefix}: no sessions found")
-    sessions = collect_raw_sessions(session_pages, notion_client)
+    sessions = collect_raw_sessions(session_pages)
     return RawWeekData(
         week_prefix=week_prefix,
         sessions=sessions,

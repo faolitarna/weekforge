@@ -3,7 +3,12 @@ from unittest.mock import MagicMock, patch
 
 from weekforge.agents.summarize_week_agent import SummarizeDeps, summarize_week_agent
 from weekforge.models.user_profile import UserProfile
-from weekforge.models.week_summary import ImplicitFeedback, SectionRates, SessionLine, WeekSummary
+from weekforge.models.week_summary import (
+    ImplicitFeedback,
+    SectionRates,
+    SessionLine,
+    WeekSummary,
+)
 
 
 @patch("weekforge.agents.summarize_week_agent.summarize_week_agent.run_sync")

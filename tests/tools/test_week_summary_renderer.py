@@ -9,7 +9,6 @@ from weekforge.models.week_summary import (
     SectionRates,
     SessionLine,
     SkipPattern,
-    SkippedPattern,
     WeekSummary,
 )
 from weekforge.tools.week_summary_renderer import render_week_summary

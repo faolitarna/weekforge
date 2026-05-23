@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -28,39 +28,35 @@ def _make_heading_block(level: int, text: str) -> dict:
     }
 
 
-def _notion_client_returning(blocks: list[dict]) -> MagicMock:
-    client = MagicMock()
-    client.blocks.children.list.return_value = {"results": blocks, "has_more": False}
-    client.comments.list.return_value = {"results": []}
-    return client
-
-
 # ---------------------------------------------------------------------------
 # collect_blocks
 # ---------------------------------------------------------------------------
 
 
-def test_collect_blocks_extracts_text():
+@patch("weekforge.tools.raw_session_collector.notion.fetch_blocks")
+def test_collect_blocks_extracts_text(mock_fetch_blocks):
     block = _make_to_do_block("Squat 5x5", True)
-    client = _notion_client_returning([block])
-    result = collect_blocks("page-1", client)
+    mock_fetch_blocks.return_value = [block]
+    result = collect_blocks("page-1")
     assert len(result) == 1
     assert result[0].text == "Squat 5x5"
     assert result[0].block_type == "to_do"
 
 
-def test_collect_blocks_checked_state():
+@patch("weekforge.tools.raw_session_collector.notion.fetch_blocks")
+def test_collect_blocks_checked_state(mock_fetch_blocks):
     blocks = [_make_to_do_block("Press", True), _make_to_do_block("Row", False)]
-    client = _notion_client_returning(blocks)
-    result = collect_blocks("page-1", client)
+    mock_fetch_blocks.return_value = blocks
+    result = collect_blocks("page-1")
     assert result[0].checked is True
     assert result[1].checked is False
 
 
-def test_collect_blocks_no_keyerror_on_missing_fields():
+@patch("weekforge.tools.raw_session_collector.notion.fetch_blocks")
+def test_collect_blocks_no_keyerror_on_missing_fields(mock_fetch_blocks):
     malformed = {"type": "to_do", "to_do": {}}  # no rich_text, no checked
-    client = _notion_client_returning([malformed])
-    result = collect_blocks("page-1", client)
+    mock_fetch_blocks.return_value = [malformed]
+    result = collect_blocks("page-1")
     assert result[0].text == ""
     assert result[0].checked is False
 
@@ -142,6 +138,5 @@ def test_compute_checkbox_analysis_always_completed():
 
 
 def test_assemble_raw_week_empty_raises():
-    client = MagicMock()
     with pytest.raises(ValueError, match="2026-W16"):
-        assemble_raw_week("2026-W16", [], client, None)
+        assemble_raw_week("2026-W16", [], None)

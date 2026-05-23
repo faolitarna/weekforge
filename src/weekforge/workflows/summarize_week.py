@@ -51,7 +51,6 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
             from weekforge.config.env import settings
             from weekforge.config.user_profile_loader import load_user_profile
             from weekforge.tools import notion_api_gateway as notion
-            from weekforge.tools.notion_api_gateway import _client as notion_client
             from weekforge.tools.raw_session_collector import assemble_raw_week
 
             _verbose(f"load_context: fetching sessions for {state.week_prefix}…")
@@ -86,7 +85,6 @@ def run_summarize(week_prefix: str, thread_id: str, store: CheckpointStore) -> N
             raw_week = assemble_raw_week(
                 week_prefix=state.week_prefix,
                 session_pages=session_pages,
-                notion_client=notion_client,
                 planned_plan_markdown=state.planned_plan_markdown,
             )
             # Serialize sessions for checkpoint persistence (exclude bulky raw block dicts)
