@@ -1,7 +1,7 @@
 # Step 2-prep: Shared Infrastructure Extraction
 
 ## Status
-ready
+done
 
 ## Goal
 
@@ -159,15 +159,15 @@ _WORKFLOW_RUNNERS: dict[str, Callable[[str, str, CheckpointStore], None]] = {
 
 ## Acceptance criteria
 
-- [ ] All 136 existing tests pass without modification (except test imports if needed)
-- [ ] `summarize_week.py` uses `run_workflow()` — no inline state-machine loop
-- [ ] `summarize_week.py` uses `summaries_db` functions — no inline query+filter patterns
-- [ ] `summarize_week.py` accept step uses `run_accept_gate()` — no inline panel+branch logic
-- [ ] `cli.py` resume uses dict registry — no if/elif chain
-- [ ] `"extraction"` alias removed from codebase
-- [ ] `get_text_prop` lives in `notion_api_gateway.py`, not in workflow files
-- [ ] `run_workflow()` saves checkpoint before each step dispatch
-- [ ] `run_workflow()` handles `None` return (quit) without deleting checkpoint
+- [x] All 136 existing tests pass without modification (except test imports if needed)
+- [x] `summarize_week.py` uses `run_workflow()` — no inline state-machine loop
+- [x] `summarize_week.py` uses `summaries_db` functions — no inline query+filter patterns
+- [x] `summarize_week.py` accept step uses `run_accept_gate()` — no inline panel+branch logic
+- [x] `cli.py` resume uses dict registry — no if/elif chain
+- [x] `"extraction"` alias removed from codebase
+- [x] `get_text_prop` lives in `notion_api_gateway.py`, not in workflow files
+- [x] `run_workflow()` saves checkpoint before each step dispatch
+- [x] `run_workflow()` handles `None` return (quit) without deleting checkpoint
 
 ## Out of scope
 
