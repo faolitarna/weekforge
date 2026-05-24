@@ -163,3 +163,104 @@ def test_run_workflow_restores_cost_from_calls(tmp_path):
     )
 
     assert captured_cost[0] == 100
+
+
+def test_run_workflow_resume_after_quit(tmp_path):
+    """A quit (None return) preserves the checkpoint; a subsequent run picks it up."""
+    store = CheckpointStore(str(tmp_path / "cp.sqlite"))
+
+    quit_calls = []
+    resume_calls = []
+
+    def step_a(state: FakeState, cost: RunCost) -> str | None:
+        if not quit_calls:
+            quit_calls.append(1)
+            return None  # first run: user quits
+        resume_calls.append(1)
+        return "done"  # second run: proceeds to done
+
+    steps = {"step_a": step_a}
+    initial = FakeState()
+
+    # First run — user quits
+    run_workflow(
+        workflow="test_wf",
+        state_cls=FakeState,
+        initial_state=initial,
+        steps=steps,
+        thread_id="tid-1",
+        store=store,
+    )
+    assert store.load("tid-1") is not None  # checkpoint survived
+
+    # Second run — resumes from checkpoint
+    run_workflow(
+        workflow="test_wf",
+        state_cls=FakeState,
+        initial_state=FakeState(),  # ignored; checkpoint wins
+        steps=steps,
+        thread_id="tid-1",
+        store=store,
+    )
+    assert store.load("tid-1") is None  # deleted on done
+    assert resume_calls, "step_a should have been called on the resumed run"
+
+
+def test_run_workflow_step_fn_mutates_state_step_is_overwritten(tmp_path):
+    """If a step function mutates state.step directly, the runner still overwrites
+    it with the returned value. The returned value wins."""
+    store = CheckpointStore(str(tmp_path / "cp.sqlite"))
+    observed_steps = []
+
+    def step_a(state: FakeState, cost: RunCost) -> str:
+        # Mutate state.step as a side-effect — runner must overwrite with return value
+        state.step = "should_be_overwritten"
+        return "done"
+
+    def done_check(state: FakeState, cost: RunCost) -> str:
+        observed_steps.append(state.step)  # should never reach here
+        return "done"
+
+    steps = {"step_a": step_a, "should_be_overwritten": done_check}
+    initial = FakeState()
+
+    run_workflow(
+        workflow="test_wf",
+        state_cls=FakeState,
+        initial_state=initial,
+        steps=steps,
+        thread_id="tid-1",
+        store=store,
+    )
+
+    # "done" was returned so loop exited; should_be_overwritten step never ran
+    assert observed_steps == [], "mutated step name should be overwritten by return value"
+    assert store.load("tid-1") is None
+
+
+def test_run_workflow_different_workflow_ignores_checkpoint(tmp_path):
+    """A checkpoint belonging to a different workflow is not loaded; initial_state is used."""
+    store = CheckpointStore(str(tmp_path / "cp.sqlite"))
+
+    stale = FakeState(step="step_b", value=99)
+    store.save("tid-1", "other_workflow", "step_b", stale)
+
+    seen_values = []
+
+    def step_a(state: FakeState, cost: RunCost) -> str:
+        seen_values.append(state.value)
+        return "done"
+
+    steps = {"step_a": step_a}
+    initial = FakeState(value=0)  # fresh start expected
+
+    run_workflow(
+        workflow="test_wf",  # different from "other_workflow"
+        state_cls=FakeState,
+        initial_state=initial,
+        steps=steps,
+        thread_id="tid-1",
+        store=store,
+    )
+
+    assert seen_values == [0], "initial_state value expected when workflow name differs"
