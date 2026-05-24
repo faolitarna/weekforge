@@ -45,7 +45,7 @@ def test_run_summarize_zero_sessions(mock_profile, mock_query, tmp_path):
 @patch("weekforge.tools.notion_api_gateway.get_title_property_name", return_value="Name")
 @patch("weekforge.tools.notion_api_gateway.create")
 @patch("weekforge.tools.notion_api_gateway.query")
-@patch("weekforge.workflows.summarize_week.hitl_confirm")
+@patch("weekforge.hitl.hitl_confirm")
 @patch("weekforge.workflows.summarize_week.run_with_metadata")
 def test_run_summarize_success(mock_run, mock_hitl, mock_query, mock_create, _mock_title, tmp_path):
     store = CheckpointStore(str(tmp_path / "checkpoints.sqlite"))
@@ -74,7 +74,7 @@ def test_run_summarize_success(mock_run, mock_hitl, mock_query, mock_create, _mo
 @patch("weekforge.tools.notion_api_gateway.get_title_property_name", return_value="Name")
 @patch("weekforge.tools.notion_api_gateway.create")
 @patch("weekforge.tools.notion_api_gateway.query")
-@patch("weekforge.workflows.summarize_week.hitl_confirm")
+@patch("weekforge.hitl.hitl_confirm")
 @patch("weekforge.workflows.summarize_week.run_with_metadata")
 def test_run_summarize_feedback_loop(mock_run, mock_hitl, mock_query, mock_create, _mock_title, tmp_path):
     store = CheckpointStore(str(tmp_path / "checkpoints.sqlite"))
