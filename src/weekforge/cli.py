@@ -101,6 +101,16 @@ def summarize_week(week: int = typer.Argument(..., help="Week number, e.g. 7")) 
     _run_or_pause(tid, lambda: run_summarize(week_prefix, tid, store))
 
 
+_WORKFLOW_RUNNERS: dict[str, Callable[[str, str, CheckpointStore], None]] = {}
+
+
+def _register_workflows() -> dict[str, Callable[[str, str, CheckpointStore], None]]:
+    if not _WORKFLOW_RUNNERS:
+        from weekforge.workflows.summarize_week import run_summarize
+        _WORKFLOW_RUNNERS["summarize_week"] = lambda wp, tid, store: run_summarize(wp, tid, store)
+    return _WORKFLOW_RUNNERS
+
+
 @app.command()
 def resume(
     thread_id: str = typer.Option(..., help="Thread ID of the checkpoint to resume."),
@@ -112,14 +122,13 @@ def resume(
         console.print(f"[red]No checkpoint found for thread-id {thread_id}[/red]")
         raise typer.Exit(code=1)
 
-    if rec.workflow in ("summarize_week", "extraction"):  # "extraction" is the legacy workflow name stored in old checkpoints
-        from weekforge.workflows.summarize_week import run_summarize
+    runners = _register_workflows()
+    runner_fn = runners.get(rec.workflow)
+    if runner_fn is None:
+        console.print(f"[red]Unknown workflow: {rec.workflow}[/red]")
+        raise typer.Exit(code=1)
 
-        _run_or_pause(thread_id, lambda: run_summarize("", thread_id, store))
-        return
-
-    console.print(f"[red]Unknown workflow: {rec.workflow}[/red]")
-    raise typer.Exit(code=1)
+    _run_or_pause(thread_id, lambda: runner_fn("", thread_id, store))
 
 
 if __name__ == "__main__":
