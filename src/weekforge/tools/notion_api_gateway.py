@@ -238,3 +238,8 @@ def update(page_id: str, properties: dict[str, Any] | None = None, content: str 
                 block_id=page_id,
                 children=new_blocks[i : i + 100],
             )
+
+
+def get_text_prop(page: dict[str, Any], prop_name: str) -> str:
+    items = page.get("properties", {}).get(prop_name, {}).get("rich_text", [])
+    return "".join(item.get("plain_text", "") for item in items)
