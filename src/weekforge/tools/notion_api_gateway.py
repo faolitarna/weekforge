@@ -241,5 +241,10 @@ def update(page_id: str, properties: dict[str, Any] | None = None, content: str 
 
 
 def get_text_prop(page: dict[str, Any], prop_name: str) -> str:
+    """Return concatenated plain text for a rich_text property; empty string if absent.
+
+    Only handles rich_text properties. Title and other types are not supported —
+    use get_title_property_name() + a direct property lookup for title fields.
+    """
     items = page.get("properties", {}).get(prop_name, {}).get("rich_text", [])
     return "".join(item.get("plain_text", "") for item in items)

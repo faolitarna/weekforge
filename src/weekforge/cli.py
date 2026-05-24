@@ -105,6 +105,7 @@ _WORKFLOW_RUNNERS: dict[str, Callable[[str, str, CheckpointStore], None]] = {}
 
 
 def _register_workflows() -> dict[str, Callable[[str, str, CheckpointStore], None]]:
+    # Deferred import — avoids circular deps at module load time.
     if not _WORKFLOW_RUNNERS:
         from weekforge.workflows.summarize_week import run_summarize
         _WORKFLOW_RUNNERS["summarize_week"] = lambda wp, tid, store: run_summarize(wp, tid, store)

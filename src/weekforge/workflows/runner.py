@@ -22,6 +22,18 @@ def run_workflow(
     thread_id: str,
     store: CheckpointStore,
 ) -> None:
+    """Dispatch steps in sequence, saving state before each dispatch.
+
+    Checkpoint is written BEFORE the step runs — on crash, resume re-runs the
+    current step from the saved state (at-least-once, not exactly-once).
+
+    Resume only matches `record.workflow == workflow`; no alias or fallback.
+    A renamed workflow string silently starts fresh rather than corrupting an
+    in-flight run from a different workflow.
+
+    A step returns the name of the next step, or None to pause (checkpoint
+    already saved above, so the run is resumable). Returns normally on "done".
+    """
     record = store.load(thread_id)
     if record is not None and record.workflow == workflow:
         state = state_cls.model_validate_json(record.state_json)
@@ -33,6 +45,7 @@ def run_workflow(
         cost.add(c)
 
     while state.step != "done":
+        # Save before dispatch — crash during step leaves a resumable checkpoint.
         store.save(thread_id, workflow, state.step, state)
 
         step_name = state.step

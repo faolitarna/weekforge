@@ -5,7 +5,8 @@ from weekforge.tools import notion_api_gateway as notion
 
 
 def find_summary_row(week_prefix: str) -> dict[str, Any] | None:
-    week_num = week_prefix[1:]  # "W07" -> "07"
+    # DB stores bare numbers ("07"), not the "W07" prefix used elsewhere.
+    week_num = week_prefix[1:]
     all_pages = notion.query(database_id=settings.notion_db_training_week_summaries)
     for page in all_pages:
         if notion.get_text_prop(page, "Week") == week_num:
@@ -40,7 +41,7 @@ def read_plan_property(page: dict[str, Any]) -> str | None:
 
 
 def upsert_summary(week_prefix: str, content: str) -> str:
-    week_num = week_prefix[1:]
+    week_num = week_prefix[1:]  # strip "W" — DB stores "07" not "W07"
     row = find_summary_row(week_prefix)
     code_block = f"```text\n{content}\n```"
 

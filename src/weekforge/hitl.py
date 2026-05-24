@@ -63,6 +63,7 @@ def hitl_confirm(
 
 @dataclass
 class AcceptResult:
+    """Outcome of an accept gate. `step` is None when the user chose to pause."""
     step: str | None
     feedback: str | None = None
 
@@ -79,6 +80,12 @@ def run_accept_gate(
     step: str,
     state: BaseModel,
 ) -> AcceptResult:
+    """Render agent output, gate on human approval, and return the next step.
+
+    Decoupled from state shape — returns AcceptResult and lets the caller set
+    state.pending_feedback. Feedback routes back to "agent"; quit returns step=None
+    (run_workflow treats None as pause, checkpoint already saved by hitl_confirm).
+    """
     context_str = render_fn()
 
     if len(calls) >= max_iterations:
