@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from pydantic import BaseModel
@@ -6,6 +7,7 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 
 from weekforge.checkpoint import CheckpointStore
+from weekforge.models.llm_call_cost import CallMetadata, RunCost
 
 _console = Console()
 
@@ -57,3 +59,51 @@ def hitl_confirm(
         return HitlDecision(approved=False, quit=True)
     feedback = Prompt.ask("Feedback")
     return HitlDecision(approved=False, feedback=feedback)
+
+
+@dataclass
+class AcceptResult:
+    step: str | None
+    feedback: str | None = None
+
+
+def run_accept_gate(
+    render_fn: Callable[[], str],
+    approved_step: str,
+    cost: RunCost,
+    calls: list[CallMetadata],
+    max_iterations: int,
+    store: CheckpointStore,
+    thread_id: str,
+    workflow: str,
+    step: str,
+    state: BaseModel,
+) -> AcceptResult:
+    context_str = render_fn()
+
+    if len(calls) >= max_iterations:
+        context_str += "\n[red bold]Token burn warning: reached max iterations. Please accept.[/red bold]\n"
+
+    context_str += f"\n{cost.summary()}"
+
+    _console.print(Panel(context_str, title="Agent Output", border_style="cyan"))
+
+    decision = hitl_confirm(
+        context=context_str,
+        recommendation="Approve proceeds. Feedback refines. Quit pauses.",
+        checkpoint=store,
+        thread_id=thread_id,
+        workflow=workflow,
+        step=step,
+        state=state,
+    )
+
+    if decision.approved:
+        return AcceptResult(step=approved_step)
+    if decision.quit:
+        _console.print(
+            f"[yellow]Paused.[/yellow] Resume: "
+            f"[bold cyan]uv run weekforge resume --thread-id {thread_id}[/bold cyan]"
+        )
+        return AcceptResult(step=None)
+    return AcceptResult(step="agent", feedback=decision.feedback)
