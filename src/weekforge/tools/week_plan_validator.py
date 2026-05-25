@@ -1,5 +1,6 @@
 from weekforge.models.week_plan import WeekPlan
 
+# "walk" intentionally excluded — it's leisure/recovery, not conditioning.
 _CONDITIONING_TAGS = frozenset({"cardio", "z1", "z2", "z3", "uphill", "loaded", "hike", "run"})
 
 _PULL_PUSH_THRESHOLD = 1.5
@@ -15,7 +16,7 @@ def validate_week_plan(plan: WeekPlan) -> tuple[bool, str | None]:
         tags = set(s.focus_tags)
         has_pull = "pull" in tags
         has_push = "push" in tags
-        if has_pull and has_push:
+        if has_pull and has_push:  # dual-tagged: 0.5 each to avoid double-counting
             pull_count += 0.5
             push_count += 0.5
         elif has_pull:

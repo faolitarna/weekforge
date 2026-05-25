@@ -153,3 +153,100 @@ class TestEmptyPlan:
         passed, diff = validate_week_plan(plan)
         assert passed is False
         assert "conditioning" in diff.lower()
+
+
+class TestWalkTagNotConditioning:
+    """'walk' is a valid FocusTag but NOT in _CONDITIONING_TAGS — it should not count."""
+
+    def test_walk_only_sessions_not_counted_as_conditioning(self):
+        from weekforge.tools.week_plan_validator import validate_week_plan
+
+        # push present → conditioning floor applies; only walk sessions → 0 conditioning → fail
+        plan = _plan([
+            ["pull"], ["pull"], ["pull"],
+            ["push"],
+            ["walk"], ["walk"],
+        ])
+        passed, diff = validate_week_plan(plan)
+        assert passed is False
+        assert "conditioning" in diff.lower()
+
+    def test_walk_plus_real_conditioning_passes(self):
+        from weekforge.tools.week_plan_validator import validate_week_plan
+
+        plan = _plan([
+            ["pull"], ["pull"], ["pull"],
+            ["push"],
+            ["walk"],
+            ["cardio", "z2"], ["run"],
+        ])
+        passed, _ = validate_week_plan(plan)
+        assert passed is True
+
+
+class TestPullOnlyWeekExemptFromConditioning:
+    """Pure pull-only week (no push) is exempt from conditioning floor."""
+
+    def test_pull_only_zero_conditioning_passes(self):
+        from weekforge.tools.week_plan_validator import validate_week_plan
+
+        plan = _plan([
+            ["pull"], ["pull"], ["pull"],
+            ["mobility"], ["core"],
+        ])
+        passed, _ = validate_week_plan(plan)
+        assert passed is True
+
+    def test_pull_plus_non_conditioning_tags_passes(self):
+        """Tags like climbing, walk, mobility with pull — no push → exempt."""
+        from weekforge.tools.week_plan_validator import validate_week_plan
+
+        plan = _plan([
+            ["pull", "core"], ["pull"], ["climbing"],
+            ["walk"], ["mobility"],
+        ])
+        passed, _ = validate_week_plan(plan)
+        assert passed is True
+
+
+class TestConditioningCountsPerSession:
+    """A session with multiple conditioning tags still counts as 1 conditioning session."""
+
+    def test_multiple_conditioning_tags_single_session_counts_once(self):
+        from weekforge.tools.week_plan_validator import validate_week_plan
+
+        # 1 session with cardio+z2+uphill → still only 1 conditioning session
+        # push present with 1 conditioning → fail (need >=2)
+        plan = _plan([
+            ["pull"], ["pull"], ["pull"],
+            ["push"],
+            ["cardio", "z2", "uphill"],
+        ])
+        passed, diff = validate_week_plan(plan)
+        assert passed is False
+        assert "conditioning_sessions=1" in diff
+
+
+class TestSinglePushSkipsRatioCheck:
+    """push_count < 2 → ratio check skipped regardless of pull:push ratio."""
+
+    def test_one_push_zero_pull_passes_ratio(self):
+        from weekforge.tools.week_plan_validator import validate_week_plan
+
+        plan = _plan([
+            ["push"],
+            ["cardio", "z2"], ["run"],
+        ])
+        passed, _ = validate_week_plan(plan)
+        assert passed is True
+
+    def test_one_push_one_pull_passes_ratio(self):
+        from weekforge.tools.week_plan_validator import validate_week_plan
+
+        plan = _plan([
+            ["pull"],
+            ["push"],
+            ["cardio", "z2"], ["run"],
+        ])
+        passed, _ = validate_week_plan(plan)
+        assert passed is True

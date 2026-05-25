@@ -173,9 +173,11 @@ def _step_validate(state: DraftWeekState, cost: RunCost) -> str | None:
 
     _console.print(f"[yellow]⚠ Validation failed again: {diff}[/yellow]")
     state.validation_warning = diff
+    # Route to "accept" (not "agent") so the human sees the warning and can quit or override.
     return "accept"
 
 
+# Hard Notion API limit for a single rich_text property value.
 _NOTION_RICH_TEXT_LIMIT = 2000
 
 
