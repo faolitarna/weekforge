@@ -1,7 +1,7 @@
 # Step 2a: CLI, State, Checkpoint
 
 ## Status
-ready
+done
 
 ## Goal
 
