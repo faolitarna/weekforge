@@ -1,5 +1,7 @@
 # Step 2d: Validation & Notion Write — Implementation Plan
 
+> **Status: DONE** (2026-05-25) — all 4 tasks implemented, 321 tests passing.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add Tier-0 plan validation (pull:push ratio + conditioning count) with single re-prompt, then write approved plan to Notion as rich-text property.
@@ -27,7 +29,7 @@
 - Create: `src/weekforge/tools/week_plan_validator.py`
 - Create: `tests/tools/test_week_plan_validator.py`
 
-- [ ] **Step 1: Write failing tests for validator**
+- [x] **Step 1: Write failing tests for validator**
 
 ```python
 # tests/tools/test_week_plan_validator.py
@@ -188,12 +190,12 @@ class TestEmptyPlan:
         assert "conditioning" in diff.lower()
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `uv run pytest tests/tools/test_week_plan_validator.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'weekforge.tools.week_plan_validator'`
 
-- [ ] **Step 3: Implement validator**
+- [x] **Step 3: Implement validator**
 
 ```python
 # src/weekforge/tools/week_plan_validator.py
@@ -245,12 +247,12 @@ def validate_week_plan(plan: WeekPlan) -> tuple[bool, str | None]:
     return True, None
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `uv run pytest tests/tools/test_week_plan_validator.py -v`
 Expected: all PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/weekforge/tools/week_plan_validator.py tests/tools/test_week_plan_validator.py
@@ -265,7 +267,7 @@ git commit -m "feat: add Tier-0 week plan validator (pull:push ratio + condition
 - Modify: `src/weekforge/workflows/draft_week.py:158-159`
 - Modify: `tests/workflows/test_draft_week.py`
 
-- [ ] **Step 1: Write failing tests for _step_validate**
+- [x] **Step 1: Write failing tests for _step_validate**
 
 Add to `tests/workflows/test_draft_week.py`:
 
@@ -378,12 +380,12 @@ def test_validate_pass_after_retry_clears_warning():
     assert state.validation_warning is None
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `uv run pytest tests/workflows/test_draft_week.py -v -k "test_validate"`
 Expected: FAIL — `RuntimeError: Not yet implemented: validate`
 
-- [ ] **Step 3: Implement _step_validate**
+- [x] **Step 3: Implement _step_validate**
 
 Replace the `_step_validate` stub in `src/weekforge/workflows/draft_week.py`:
 
@@ -409,12 +411,12 @@ def _step_validate(state: DraftWeekState, cost: RunCost) -> str | None:
     return "accept"
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `uv run pytest tests/workflows/test_draft_week.py -v -k "test_validate"`
 Expected: all PASS
 
-- [ ] **Step 5: Run existing tests for regressions**
+- [x] **Step 5: Run existing tests for regressions**
 
 Run: `uv run pytest tests/workflows/test_draft_week.py -v`
 Expected: all PASS (existing tests that reach validate now hit the real code, but those tests mock `run_accept_gate` to return `step="validate"` which then hits `_step_validate` — the plan it passes may fail validation, but the test already expects `RuntimeError("Not yet implemented.*validate")`. Wait — those tests were updated in 2c to expect validate stub. Now validate is real, they'll proceed further. Let me check.)
@@ -496,12 +498,12 @@ def test_stub_steps_raise():
         _step_write(state, cost)
 ```
 
-- [ ] **Step 6: Run all draft_week tests**
+- [x] **Step 6: Run all draft_week tests**
 
 Run: `uv run pytest tests/workflows/test_draft_week.py -v`
 Expected: all PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/weekforge/workflows/draft_week.py tests/workflows/test_draft_week.py
@@ -516,7 +518,7 @@ git commit -m "feat: implement _step_validate with retry guard and re-prompt"
 - Modify: `src/weekforge/workflows/draft_week.py:162-163`
 - Modify: `tests/workflows/test_draft_week.py`
 
-- [ ] **Step 1: Write failing tests for _step_write**
+- [x] **Step 1: Write failing tests for _step_write**
 
 Add to `tests/workflows/test_draft_week.py`:
 
@@ -598,12 +600,12 @@ def test_write_idempotent_second_call(mock_db):
     assert mock_db.upsert_plan.call_count == 2
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `uv run pytest tests/workflows/test_draft_week.py -v -k "test_write"`
 Expected: FAIL — `RuntimeError: Not yet implemented: write`
 
-- [ ] **Step 3: Implement _step_write**
+- [x] **Step 3: Implement _step_write**
 
 Replace the `_step_write` stub in `src/weekforge/workflows/draft_week.py`:
 
@@ -628,12 +630,12 @@ def _step_write(state: DraftWeekState, cost: RunCost) -> str | None:
     return "done"
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `uv run pytest tests/workflows/test_draft_week.py -v -k "test_write"`
 Expected: all PASS
 
-- [ ] **Step 5: Update `test_stub_steps_raise` to remove `_step_write`**
+- [x] **Step 5: Update `test_stub_steps_raise` to remove `_step_write`**
 
 Since `_step_write` is now real, remove the test entirely — no stubs remain:
 
@@ -641,12 +643,12 @@ Since `_step_write` is now real, remove the test entirely — no stubs remain:
 # Delete test_stub_steps_raise entirely — both validate and write are now implemented.
 ```
 
-- [ ] **Step 6: Run full test suite**
+- [x] **Step 6: Run full test suite**
 
 Run: `uv run pytest -v`
 Expected: all PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/weekforge/workflows/draft_week.py tests/workflows/test_draft_week.py
@@ -662,7 +664,7 @@ git commit -m "feat: implement _step_write with Notion upsert and truncation gua
 
 This task adds an integration test that exercises the full validate→write flow through `run_draft`, verifying the complete happy path and the validation-retry path.
 
-- [ ] **Step 1: Write integration tests**
+- [x] **Step 1: Write integration tests**
 
 Add to `tests/workflows/test_draft_week.py`:
 
@@ -783,17 +785,17 @@ def test_e2e_validate_fail_reprompt_then_pass(mock_run_meta, mock_gate, mock_not
     assert "pull:push" in second_prompt
 ```
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 Run: `uv run pytest tests/workflows/test_draft_week.py -v -k "e2e"`
 Expected: all PASS
 
-- [ ] **Step 3: Run full test suite**
+- [x] **Step 3: Run full test suite**
 
 Run: `uv run pytest -v`
 Expected: all PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests/workflows/test_draft_week.py

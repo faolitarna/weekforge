@@ -1,7 +1,7 @@
 # Step 2: Draft Week (`draft_week`) — Index
 
 ## Status
-ready (sub-step index)
+✅ Done — all sub-steps (2-prep, 2a–2d) implemented
 
 ## Goal
 
@@ -22,8 +22,8 @@ Step 1 complete — extraction subsystem ships `WeekSummary`, `PlanState`, `summ
 | 2-prep | [Shared Infrastructure](./step-2-prep-shared-infra.md) | Extract `run_workflow()` runner, `summaries_db` helper, `get_text_prop` to gateway, accept gate, CLI resume registry, drop legacy `"extraction"` alias | ✅ |
 | 2a | [CLI, State, Checkpoint](./step-2a-cli-state-checkpoint.md) | `weekforge draft-week <week>` Typer command, `DraftWeekState`, step registry for `draft_week`, overwrite-confirm gate | ✅ |
 | 2b | [Context Loading](./step-2b-context-loading.md) | Tier-0: templates by prefix, 3-week feedback window via `summaries_db`, PLAN_STATE load, user profile, `active_flare` derivation | ✅ |
-| 2c | [Draft Week Agent + HITL](./step-2c-planning-agent-hitl.md) | `draft_week_agent`, `prompts/draft-week-task.md`, `WeekPlan` output type, accept gate via shared `run_accept_gate` | ⬜ |
-| 2d | [Validation & Notion Write](./step-2d-validation-and-write.md) | Tier-0 pull:push + conditioning checks with 1-retry re-prompt, `summaries_db.upsert_plan()`, transition to step-3 generation loop | ⬜ |
+| 2c | [Draft Week Agent + HITL](./step-2c-planning-agent-hitl.md) | `draft_week_agent`, `prompts/draft-week-task.md`, `WeekPlan` output type, accept gate via shared `run_accept_gate` | ✅ |
+| 2d | [Validation & Notion Write](./step-2d-validation-and-write.md) | Tier-0 pull:push + conditioning checks with 1-retry re-prompt, `summaries_db.upsert_plan()`, transition to step-3 generation loop | ✅ |
 
 ## Decisions
 
