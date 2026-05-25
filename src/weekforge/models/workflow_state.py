@@ -25,3 +25,19 @@ class SummarizeWeekState(BaseModel):
     plan_state_page_id: str | None = None
     
     started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class DraftWeekState(BaseModel):
+    week_prefix: str
+    step: str = "overwrite_check"
+    messages_json: list[dict[str, Any]] = Field(default_factory=list)
+    calls: list[CallMetadata] = Field(default_factory=list)
+    last_output: Any = None
+    pending_feedback: str | None = None
+    validation_retry_used: bool = False
+    validation_warning: str | None = None
+    written_page_id: str | None = None
+    is_bootstrap: bool | None = None
+    plan_state_raw: str | None = None
+    plan_state_page_id: str | None = None
+    started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
