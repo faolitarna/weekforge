@@ -156,7 +156,24 @@ def _step_agent(state: DraftWeekState, cost: RunCost) -> str | None:
 
 
 def _step_validate(state: DraftWeekState, cost: RunCost) -> str | None:
-    raise RuntimeError("Not yet implemented: validate (step 2d)")
+    from weekforge.tools.week_plan_validator import validate_week_plan
+
+    assert state.last_output is not None
+    passed, diff = validate_week_plan(state.last_output)
+
+    if passed:
+        state.validation_warning = None
+        return "write"
+
+    if not state.validation_retry_used:
+        _console.print(f"[yellow]⚠ Validation failed (first attempt): {diff}[/yellow]")
+        state.validation_retry_used = True
+        state.pending_feedback = diff
+        return "agent"
+
+    _console.print(f"[yellow]⚠ Validation failed again: {diff}[/yellow]")
+    state.validation_warning = diff
+    return "accept"
 
 
 def _step_write(state: DraftWeekState, cost: RunCost) -> str | None:

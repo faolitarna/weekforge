@@ -8,12 +8,13 @@ from weekforge.models.week_plan import PlannedSession, WeekPlan
 from weekforge.models.workflow_state import DraftWeekState
 
 
+@patch("weekforge.tools.week_plan_validator.validate_week_plan", return_value=(True, None))
 @patch("weekforge.workflows.draft_week.run_accept_gate")
 @patch("weekforge.workflows.draft_week.run_with_metadata")
 @patch("weekforge.workflows.draft_week.load_user_profile")
 @patch("weekforge.workflows.draft_week.notion")
-def test_overwrite_check_no_existing_row(mock_notion, mock_profile, mock_run_meta, mock_gate, tmp_path):
-    """No summary row → skip overwrite, load context, agent runs, hits validate stub."""
+def test_overwrite_check_no_existing_row(mock_notion, mock_profile, mock_run_meta, mock_gate, mock_validator, tmp_path):
+    """No summary row → skip overwrite, load context, agent runs, hits write stub."""
     from weekforge.workflows.draft_week import run_draft
     from weekforge.models.user_profile import UserProfile
     from weekforge.hitl import AcceptResult
@@ -34,18 +35,19 @@ def test_overwrite_check_no_existing_row(mock_notion, mock_profile, mock_run_met
     with patch("weekforge.workflows.draft_week.summaries_db") as mock_db:
         mock_db.find_summary_row.return_value = None
         mock_db.find_plan_state_row.return_value = (None, None)
-        with pytest.raises(RuntimeError, match="Not yet implemented.*validate"):
+        with pytest.raises(RuntimeError, match="Not yet implemented.*write"):
             run_draft("W15", "draft-week-W15", store)
 
     mock_db.find_summary_row.assert_called()
 
 
+@patch("weekforge.tools.week_plan_validator.validate_week_plan", return_value=(True, None))
 @patch("weekforge.workflows.draft_week.run_accept_gate")
 @patch("weekforge.workflows.draft_week.run_with_metadata")
 @patch("weekforge.workflows.draft_week.load_user_profile")
 @patch("weekforge.workflows.draft_week.notion")
-def test_overwrite_check_existing_row_empty_plan(mock_notion, mock_profile, mock_run_meta, mock_gate, tmp_path):
-    """Row exists but Plan empty → skip overwrite, load context, agent runs, hits validate stub."""
+def test_overwrite_check_existing_row_empty_plan(mock_notion, mock_profile, mock_run_meta, mock_gate, mock_validator, tmp_path):
+    """Row exists but Plan empty → skip overwrite, load context, agent runs, hits write stub."""
     from weekforge.workflows.draft_week import run_draft
     from weekforge.models.user_profile import UserProfile
     from weekforge.hitl import AcceptResult
@@ -68,17 +70,18 @@ def test_overwrite_check_existing_row_empty_plan(mock_notion, mock_profile, mock
         mock_db.read_plan_property.return_value = None
         mock_db.read_summary_body.return_value = None
         mock_db.find_plan_state_row.return_value = (None, None)
-        with pytest.raises(RuntimeError, match="Not yet implemented.*validate"):
+        with pytest.raises(RuntimeError, match="Not yet implemented.*write"):
             run_draft("W15", "draft-week-W15", store)
 
 
+@patch("weekforge.tools.week_plan_validator.validate_week_plan", return_value=(True, None))
 @patch("weekforge.workflows.draft_week.run_accept_gate")
 @patch("weekforge.workflows.draft_week.run_with_metadata")
 @patch("weekforge.workflows.draft_week.load_user_profile")
 @patch("weekforge.workflows.draft_week.notion")
 @patch("weekforge.workflows.draft_week.hitl_confirm")
-def test_overwrite_check_existing_plan_approve(mock_confirm, mock_notion, mock_profile, mock_run_meta, mock_gate, tmp_path):
-    """Row has Plan → HITL approve → load_context → agent runs → hits validate stub."""
+def test_overwrite_check_existing_plan_approve(mock_confirm, mock_notion, mock_profile, mock_run_meta, mock_gate, mock_validator, tmp_path):
+    """Row has Plan → HITL approve → load_context → agent runs → hits write stub."""
     from weekforge.workflows.draft_week import run_draft
     from weekforge.models.user_profile import UserProfile
     from weekforge.hitl import AcceptResult
@@ -102,7 +105,7 @@ def test_overwrite_check_existing_plan_approve(mock_confirm, mock_notion, mock_p
         mock_db.read_plan_property.return_value = "Push day + Hinge day\nConditioning x2"
         mock_db.read_summary_body.return_value = None
         mock_db.find_plan_state_row.return_value = (None, None)
-        with pytest.raises(RuntimeError, match="Not yet implemented.*validate"):
+        with pytest.raises(RuntimeError, match="Not yet implemented.*write"):
             run_draft("W15", "draft-week-W15", store)
 
     mock_confirm.assert_called_once()
@@ -163,19 +166,20 @@ def test_overwrite_check_plan_preview_truncated(mock_notion, mock_profile, tmp_p
     fake_result = MagicMock()
     fake_result.output = fake_plan
 
-    with patch("weekforge.workflows.draft_week.hitl_confirm") as mock_confirm:
-        mock_confirm.return_value = MagicMock(approved=True, quit=False, feedback=None)
-        with patch("weekforge.workflows.draft_week.run_with_metadata") as mock_run_meta:
-            mock_run_meta.return_value = (fake_result, MagicMock(input_tokens=0, output_tokens=0, latency_ms=0, model_used="t", cost_eur=0), [])
-            with patch("weekforge.workflows.draft_week.run_accept_gate") as mock_gate:
-                mock_gate.return_value = AcceptResult(step="validate", feedback=None)
-                with patch("weekforge.workflows.draft_week.summaries_db") as mock_db:
-                    mock_db.find_summary_row.return_value = {"id": "page-1"}
-                    mock_db.read_plan_property.return_value = long_plan
-                    mock_db.read_summary_body.return_value = None
-                    mock_db.find_plan_state_row.return_value = (None, None)
-                    with pytest.raises(RuntimeError, match="Not yet implemented"):
-                        run_draft("W15", "draft-week-W15", store)
+    with patch("weekforge.tools.week_plan_validator.validate_week_plan", return_value=(True, None)):
+        with patch("weekforge.workflows.draft_week.hitl_confirm") as mock_confirm:
+            mock_confirm.return_value = MagicMock(approved=True, quit=False, feedback=None)
+            with patch("weekforge.workflows.draft_week.run_with_metadata") as mock_run_meta:
+                mock_run_meta.return_value = (fake_result, MagicMock(input_tokens=0, output_tokens=0, latency_ms=0, model_used="t", cost_eur=0), [])
+                with patch("weekforge.workflows.draft_week.run_accept_gate") as mock_gate:
+                    mock_gate.return_value = AcceptResult(step="validate", feedback=None)
+                    with patch("weekforge.workflows.draft_week.summaries_db") as mock_db:
+                        mock_db.find_summary_row.return_value = {"id": "page-1"}
+                        mock_db.read_plan_property.return_value = long_plan
+                        mock_db.read_summary_body.return_value = None
+                        mock_db.find_plan_state_row.return_value = (None, None)
+                        with pytest.raises(RuntimeError, match="Not yet implemented.*write"):
+                            run_draft("W15", "draft-week-W15", store)
 
     call_kwargs = mock_confirm.call_args
     context_text = call_kwargs.kwargs.get("context", call_kwargs[1].get("context", ""))
@@ -187,24 +191,21 @@ def test_overwrite_check_plan_preview_truncated(mock_notion, mock_profile, tmp_p
 
 def test_stub_steps_raise():
     """Remaining future steps raise RuntimeError."""
-    from weekforge.workflows.draft_week import (
-        _step_validate,
-        _step_write,
-    )
+    from weekforge.workflows.draft_week import _step_write
 
     state = DraftWeekState(week_prefix="W15")
     cost = RunCost()
 
-    for step_fn in [_step_validate, _step_write]:
-        with pytest.raises(RuntimeError, match="Not yet implemented"):
-            step_fn(state, cost)
+    with pytest.raises(RuntimeError, match="Not yet implemented"):
+        _step_write(state, cost)
 
 
+@patch("weekforge.tools.week_plan_validator.validate_week_plan", return_value=(True, None))
 @patch("weekforge.workflows.draft_week.run_accept_gate")
 @patch("weekforge.workflows.draft_week.run_with_metadata")
 @patch("weekforge.workflows.draft_week.load_user_profile")
 @patch("weekforge.workflows.draft_week.notion")
-def test_run_draft_creates_checkpoint(mock_notion, mock_profile, mock_run_meta, mock_gate, tmp_path):
+def test_run_draft_creates_checkpoint(mock_notion, mock_profile, mock_run_meta, mock_gate, mock_validator, tmp_path):
     """run_draft saves checkpoint before first step dispatch."""
     from weekforge.workflows.draft_week import run_draft
     from weekforge.models.user_profile import UserProfile
@@ -226,7 +227,7 @@ def test_run_draft_creates_checkpoint(mock_notion, mock_profile, mock_run_meta, 
     with patch("weekforge.workflows.draft_week.summaries_db") as mock_db:
         mock_db.find_summary_row.return_value = None
         mock_db.find_plan_state_row.return_value = (None, None)
-        with pytest.raises(RuntimeError, match="Not yet implemented"):
+        with pytest.raises(RuntimeError, match="Not yet implemented.*write"):
             run_draft("W15", "draft-week-W15", store)
 
     rec = store.load("draft-week-W15")
@@ -234,12 +235,13 @@ def test_run_draft_creates_checkpoint(mock_notion, mock_profile, mock_run_meta, 
     assert rec.workflow == "draft_week"
 
 
+@patch("weekforge.tools.week_plan_validator.validate_week_plan", return_value=(True, None))
 @patch("weekforge.workflows.draft_week.run_accept_gate")
 @patch("weekforge.workflows.draft_week.run_with_metadata")
 @patch("weekforge.workflows.draft_week.load_user_profile")
 @patch("weekforge.workflows.draft_week.notion")
-def test_run_draft_resumes_from_checkpoint(mock_notion, mock_profile, mock_run_meta, mock_gate, tmp_path):
-    """Resume dispatches to the saved step (load_context → agent runs → hits validate stub)."""
+def test_run_draft_resumes_from_checkpoint(mock_notion, mock_profile, mock_run_meta, mock_gate, mock_validator, tmp_path):
+    """Resume dispatches to the saved step (load_context → agent runs → hits write stub)."""
     from weekforge.workflows.draft_week import run_draft
     from weekforge.models.user_profile import UserProfile
     from weekforge.hitl import AcceptResult
@@ -262,7 +264,7 @@ def test_run_draft_resumes_from_checkpoint(mock_notion, mock_profile, mock_run_m
     with patch("weekforge.workflows.draft_week.summaries_db") as mock_db:
         mock_db.find_summary_row.return_value = None
         mock_db.find_plan_state_row.return_value = (None, None)
-        with pytest.raises(RuntimeError, match="Not yet implemented.*validate"):
+        with pytest.raises(RuntimeError, match="Not yet implemented.*write"):
             run_draft("W15", "draft-week-W15", store)
 
 
@@ -416,13 +418,14 @@ def test_load_context_feedback_window_ordering(mock_notion, mock_db, mock_profil
     assert calls == ["W14", "W13", "W12"]
 
 
+@patch("weekforge.tools.week_plan_validator.validate_week_plan", return_value=(True, None))
 @patch("weekforge.workflows.draft_week.run_accept_gate")
 @patch("weekforge.workflows.draft_week.run_with_metadata")
 @patch("weekforge.workflows.draft_week.load_user_profile")
 @patch("weekforge.workflows.draft_week.summaries_db")
 @patch("weekforge.workflows.draft_week.notion")
-def test_load_context_end_to_end_through_workflow(mock_notion, mock_db, mock_profile, mock_run_meta, mock_gate, tmp_path):
-    """load_context step runs through the full workflow, agent runs, hits validate stub."""
+def test_load_context_end_to_end_through_workflow(mock_notion, mock_db, mock_profile, mock_run_meta, mock_gate, mock_validator, tmp_path):
+    """load_context step runs through the full workflow, agent runs, hits write stub."""
     from weekforge.workflows.draft_week import run_draft
     from weekforge.models.user_profile import UserProfile
     from weekforge.hitl import AcceptResult
@@ -443,7 +446,7 @@ def test_load_context_end_to_end_through_workflow(mock_notion, mock_db, mock_pro
     mock_run_meta.return_value = (fake_result, MagicMock(input_tokens=0, output_tokens=0, latency_ms=0, model_used="t", cost_eur=0), [])
     mock_gate.return_value = AcceptResult(step="validate", feedback=None)
 
-    with pytest.raises(RuntimeError, match="Not yet implemented.*validate"):
+    with pytest.raises(RuntimeError, match="Not yet implemented.*write"):
         run_draft("W15", "draft-week-W15", store)
 
 
@@ -694,13 +697,14 @@ def test_step_agent_accumulates_calls(mock_notion, mock_db, mock_profile):
 # --- step_accept integration tests ---
 
 
+@patch("weekforge.tools.week_plan_validator.validate_week_plan", return_value=(True, None))
 @patch("weekforge.workflows.draft_week.load_user_profile")
 @patch("weekforge.workflows.draft_week.summaries_db")
 @patch("weekforge.workflows.draft_week.notion")
 @patch("weekforge.workflows.draft_week.run_accept_gate")
 @patch("weekforge.workflows.draft_week.run_with_metadata")
-def test_accept_approve_transitions_to_validate(mock_run_meta, mock_gate, mock_notion, mock_db, mock_profile, tmp_path):
-    """Accept → approve → step becomes 'validate'."""
+def test_accept_approve_transitions_to_validate(mock_run_meta, mock_gate, mock_notion, mock_db, mock_profile, mock_validator, tmp_path):
+    """Accept → approve → validate passes → hits write stub."""
     from weekforge.workflows.draft_week import run_draft
     from weekforge.models.user_profile import UserProfile
     from weekforge.hitl import AcceptResult
@@ -724,7 +728,7 @@ def test_accept_approve_transitions_to_validate(mock_run_meta, mock_gate, mock_n
 
     mock_gate.return_value = AcceptResult(step="validate", feedback=None)
 
-    with pytest.raises(RuntimeError, match="Not yet implemented.*validate"):
+    with pytest.raises(RuntimeError, match="Not yet implemented.*write"):
         run_draft("W15", "draft-week-W15", store)
 
     mock_gate.assert_called_once()
@@ -806,3 +810,115 @@ def test_accept_feedback_loops_to_agent(mock_run_meta, mock_gate, mock_notion, m
     assert mock_run_meta.call_count == 2
     second_prompt = mock_run_meta.call_args_list[1][0][1]
     assert "add more conditioning" in second_prompt
+
+
+# --- validate step tests ---
+
+
+def test_validate_pass_transitions_to_write():
+    """Valid plan → step returns 'write'."""
+    from weekforge.workflows.draft_week import _step_validate
+
+    plan = WeekPlan(
+        week_prefix="W15",
+        sessions=[
+            PlannedSession(name="Pull A", duration_min=85, focus_tags=["pull"]),
+            PlannedSession(name="Pull B", duration_min=85, focus_tags=["pull"]),
+            PlannedSession(name="Pull C", duration_min=85, focus_tags=["pull"]),
+            PlannedSession(name="Push A", duration_min=85, focus_tags=["push"]),
+            PlannedSession(name="Z2 Run", duration_min=75, focus_tags=["cardio", "z2"]),
+            PlannedSession(name="Z2 Hike", duration_min=90, focus_tags=["hike", "uphill"]),
+        ],
+    )
+    state = DraftWeekState(week_prefix="W15", step="validate", last_output=plan)
+    cost = RunCost()
+
+    with patch("weekforge.tools.week_plan_validator.validate_week_plan", return_value=(True, None)):
+        result = _step_validate(state, cost)
+
+    assert result == "write"
+    assert state.validation_warning is None
+    assert state.validation_retry_used is False
+
+
+def test_validate_fail_first_time_reprompts():
+    """First validation failure → pending_feedback set, returns 'agent'."""
+    from weekforge.workflows.draft_week import _step_validate
+
+    plan = WeekPlan(
+        week_prefix="W15",
+        sessions=[
+            PlannedSession(name="Pull A", duration_min=85, focus_tags=["pull"]),
+            PlannedSession(name="Push A", duration_min=85, focus_tags=["push"]),
+            PlannedSession(name="Push B", duration_min=85, focus_tags=["push"]),
+            PlannedSession(name="Z2 Run", duration_min=75, focus_tags=["cardio", "z2"]),
+            PlannedSession(name="Z2 Hike", duration_min=90, focus_tags=["hike", "uphill"]),
+        ],
+    )
+    state = DraftWeekState(week_prefix="W15", step="validate", last_output=plan)
+    cost = RunCost()
+
+    with patch("weekforge.tools.week_plan_validator.validate_week_plan", return_value=(False, "pull:push ratio off")):
+        result = _step_validate(state, cost)
+
+    assert result == "agent"
+    assert state.validation_retry_used is True
+    assert state.pending_feedback is not None
+    assert "pull:push" in state.pending_feedback
+
+
+def test_validate_fail_second_time_warns_and_loops_to_accept():
+    """Second validation failure → warning set, returns 'accept'."""
+    from weekforge.workflows.draft_week import _step_validate
+
+    plan = WeekPlan(
+        week_prefix="W15",
+        sessions=[
+            PlannedSession(name="Pull A", duration_min=85, focus_tags=["pull"]),
+            PlannedSession(name="Push A", duration_min=85, focus_tags=["push"]),
+            PlannedSession(name="Push B", duration_min=85, focus_tags=["push"]),
+            PlannedSession(name="Z2 Run", duration_min=75, focus_tags=["cardio", "z2"]),
+            PlannedSession(name="Z2 Hike", duration_min=90, focus_tags=["hike", "uphill"]),
+        ],
+    )
+    state = DraftWeekState(
+        week_prefix="W15", step="validate", last_output=plan,
+        validation_retry_used=True,
+    )
+    cost = RunCost()
+
+    with patch("weekforge.tools.week_plan_validator.validate_week_plan", return_value=(False, "pull:push ratio off")):
+        result = _step_validate(state, cost)
+
+    assert result == "accept"
+    assert state.validation_warning is not None
+    assert "pull:push" in state.validation_warning
+    assert state.pending_feedback is None
+
+
+def test_validate_pass_after_retry_clears_warning():
+    """Pass on second attempt → write, no warning."""
+    from weekforge.workflows.draft_week import _step_validate
+
+    plan = WeekPlan(
+        week_prefix="W15",
+        sessions=[
+            PlannedSession(name="Pull A", duration_min=85, focus_tags=["pull"]),
+            PlannedSession(name="Pull B", duration_min=85, focus_tags=["pull"]),
+            PlannedSession(name="Pull C", duration_min=85, focus_tags=["pull"]),
+            PlannedSession(name="Push A", duration_min=85, focus_tags=["push"]),
+            PlannedSession(name="Z2 Run", duration_min=75, focus_tags=["cardio", "z2"]),
+            PlannedSession(name="Z2 Hike", duration_min=90, focus_tags=["hike", "uphill"]),
+        ],
+    )
+    state = DraftWeekState(
+        week_prefix="W15", step="validate", last_output=plan,
+        validation_retry_used=True,
+    )
+    cost = RunCost()
+
+    with patch("weekforge.tools.week_plan_validator.validate_week_plan", return_value=(True, None)):
+        result = _step_validate(state, cost)
+
+    assert result == "write"
+    assert state.validation_warning is None
