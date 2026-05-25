@@ -1,7 +1,7 @@
 # Step 2b: Context Loading (Tier-0)
 
 ## Status
-ready
+done
 
 ## Goal
 

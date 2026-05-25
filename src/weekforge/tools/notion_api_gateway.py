@@ -248,3 +248,15 @@ def get_text_prop(page: dict[str, Any], prop_name: str) -> str:
     """
     items = page.get("properties", {}).get(prop_name, {}).get("rich_text", [])
     return "".join(item.get("plain_text", "") for item in items)
+
+
+def get_page_title(page: dict[str, Any]) -> str:
+    """Return concatenated plain text from the title property; empty string if absent.
+
+    Notion title properties have structure: {"type": "title", "title": [{"plain_text": "..."}]}.
+    The property key name varies per database, so we scan by type rather than by name.
+    """
+    for prop in page.get("properties", {}).values():
+        if prop.get("type") == "title":
+            return "".join(item.get("plain_text", "") for item in prop.get("title", []))
+    return ""

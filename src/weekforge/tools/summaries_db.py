@@ -40,6 +40,21 @@ def read_plan_property(page: dict[str, Any]) -> str | None:
     return text or None
 
 
+def read_summary_body(page: dict[str, Any]) -> str | None:
+    # Reads only code blocks. Paragraphs are intentionally skipped — summaries
+    # are stored as fenced code blocks; free-form paragraphs are editorial notes.
+    page_id = page["id"]
+    fetched = notion.fetch(page_id)
+    content_blocks = fetched.get("content", [])
+    text = ""
+    for block in content_blocks:
+        if block["type"] == "code":
+            text += "".join(
+                t["text"]["content"] for t in block["code"]["rich_text"]
+            ) + "\n"
+    return text.strip() or None
+
+
 def upsert_summary(week_prefix: str, content: str) -> str:
     week_num = week_prefix[1:]  # strip "W" — DB stores "07" not "W07"
     row = find_summary_row(week_prefix)

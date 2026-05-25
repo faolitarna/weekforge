@@ -17,10 +17,10 @@
 | 1d | [Notion Write & PLAN_STATE](./steps/step-1d-notion-write-and-plan-state.md) | Legacy-format renderer, Notion row update, PLAN_STATE incremental/bootstrap | ✅ |
 | 1e | [Summary Format Alignment](./steps/step-1e-summary-formatting.md) | Pipe-delimited renderer, JointEntry pain model, token-optimized format | ✅ |
 | 1f | [Exercise Log Extraction](./steps/step-1f-exercise-log-extraction.md) | Raw sessions → agent, exercise/cardio/climbing logs, plan adherence, step reorder | ✅ |
-| 2 | [Planning](./steps/step-2-planning.md) | `draft_week` — index → sub-steps 2-prep, 2a–2d | ⬜ |
-| 2-prep | [Shared Infrastructure](./steps/step-2-prep-shared-infra.md) | Extract `run_workflow()`, `summaries_db`, `get_text_prop`, accept gate, CLI resume registry from `summarize_week` | ⬜ |
-| 2a | [CLI, State, Checkpoint](./steps/step-2a-cli-state-checkpoint.md) | `weekforge draft-week <week>` Typer command, `DraftWeekState`, step registry, overwrite-confirm gate | ⬜ |
-| 2b | [Context Loading](./steps/step-2b-context-loading.md) | Tier-0: templates, 3-week feedback, PLAN_STATE, user profile, `active_flare` | ⬜ |
+| 2 | [Planning](./steps/step-2-planning.md) | `draft_week` — index → sub-steps 2-prep, 2a–2d | 🔄 |
+| 2-prep | [Shared Infrastructure](./steps/step-2-prep-shared-infra.md) | Extract `run_workflow()`, `summaries_db`, `get_text_prop`, accept gate, CLI resume registry from `summarize_week` | ✅ |
+| 2a | [CLI, State, Checkpoint](./steps/step-2a-cli-state-checkpoint.md) | `weekforge draft-week <week>` Typer command, `DraftWeekState`, step registry, overwrite-confirm gate | ✅ |
+| 2b | [Context Loading](./steps/step-2b-context-loading.md) | Tier-0: templates, 3-week feedback, PLAN_STATE, user profile, `active_flare` | ✅ |
 | 2c | [Draft Week Agent + HITL](./steps/step-2c-planning-agent-hitl.md) | `draft_week_agent`, `WeekPlan` output, accept/feedback/quit gate | ⬜ |
 | 2d | [Validation & Notion Write](./steps/step-2d-validation-and-write.md) | Tier-0 ratio/conditioning checks + 1-retry, Plan-property write, transition to step-3 | ⬜ |
 | 3 | [Generation](./steps/step-3-generation.md) | `draft_session` + Deterministic Evaluator loop | ⬜ |

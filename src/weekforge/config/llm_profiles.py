@@ -33,6 +33,11 @@ LLM_PROFILES: dict[str, LLMProfile] = {
         model="gpt-5.4",
         reasoning_effort="low",
     ),
+    "gpt-5.4-high": LLMProfile(
+        provider="openai",
+        model="gpt-5.4",
+        reasoning_effort="high",
+    ),
 }
 
 
