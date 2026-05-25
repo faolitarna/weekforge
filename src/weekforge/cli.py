@@ -83,10 +83,16 @@ def main(ctx: typer.Context) -> None:
     console.print(table)
 
 
-@app.command()
-def plan() -> None:
-    """Start or resume the planning lifecycle (not yet implemented)."""
-    console.print("[dim]Not yet implemented (step 2).[/dim]")
+@app.command("draft-week")
+def draft_week(week: int = typer.Argument(..., help="Week number, e.g. 15")) -> None:
+    """Draft a high-level weekly training plan."""
+    from weekforge.tools.formatting import format_week_prefix
+    from weekforge.workflows.draft_week import run_draft
+
+    store = _make_store()
+    week_prefix = format_week_prefix(week)
+    tid = f"draft-week-{week_prefix}"
+    _run_or_pause(tid, lambda: run_draft(week_prefix, tid, store))
 
 
 @app.command("summarize-week")
@@ -107,8 +113,10 @@ _WORKFLOW_RUNNERS: dict[str, Callable[[str, str, CheckpointStore], None]] = {}
 def _register_workflows() -> dict[str, Callable[[str, str, CheckpointStore], None]]:
     # Deferred import — avoids circular deps at module load time.
     if not _WORKFLOW_RUNNERS:
+        from weekforge.workflows.draft_week import run_draft
         from weekforge.workflows.summarize_week import run_summarize
         _WORKFLOW_RUNNERS["summarize_week"] = lambda wp, tid, store: run_summarize(wp, tid, store)
+        _WORKFLOW_RUNNERS["draft_week"] = lambda wp, tid, store: run_draft(wp, tid, store)
     return _WORKFLOW_RUNNERS
 
 

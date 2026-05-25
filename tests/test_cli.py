@@ -5,6 +5,7 @@ from typer.testing import CliRunner
 
 from weekforge.checkpoint import CheckpointStore
 from weekforge.cli import app
+from weekforge.models.workflow_state import DraftWeekState
 
 runner = CliRunner()
 
@@ -54,3 +55,44 @@ def test_cli_register_workflows_is_idempotent() -> None:
 
     assert first_keys == second_keys
     assert len(second_keys) == len(set(second_keys)), "no duplicate workflow keys after double registration"
+
+
+def test_cli_draft_week_help() -> None:
+    """draft-week command exists and shows help."""
+    result = runner.invoke(app, ["draft-week", "--help"])
+    assert result.exit_code == 0
+    assert "draft" in result.stdout.lower()
+
+
+def test_cli_plan_placeholder_removed() -> None:
+    """Old 'plan' command no longer exists."""
+    result = runner.invoke(app, ["plan"])
+    assert result.exit_code != 0
+
+
+def test_cli_resume_dispatches_draft_week(tmp_path) -> None:
+    """resume with draft_week checkpoint dispatches to run_draft."""
+    from weekforge.cli import _WORKFLOW_RUNNERS
+
+    store = CheckpointStore(str(tmp_path / "cp.sqlite"))
+    state = DraftWeekState(week_prefix="W15", step="load_context")
+    store.save("draft-week-W15", "draft_week", "load_context", state)
+
+    with patch("weekforge.cli._make_store", return_value=store):
+        with patch("weekforge.workflows.draft_week.run_draft") as mock_run:
+            mock_run.side_effect = RuntimeError("Not yet implemented")
+            # Clear cache so _register_workflows re-imports while mock is active.
+            _WORKFLOW_RUNNERS.clear()
+            result = runner.invoke(app, ["resume", "--thread-id", "draft-week-W15"])
+
+    mock_run.assert_called_once()
+
+
+def test_cli_register_workflows_includes_draft_week() -> None:
+    """_register_workflows includes draft_week entry."""
+    from weekforge.cli import _register_workflows, _WORKFLOW_RUNNERS
+    _WORKFLOW_RUNNERS.clear()
+
+    runners = _register_workflows()
+    assert "draft_week" in runners
+    assert "summarize_week" in runners
