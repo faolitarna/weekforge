@@ -996,3 +996,119 @@ def test_write_idempotent_second_call(mock_db):
         assert result == "done"
 
     assert mock_db.upsert_plan.call_count == 2
+
+
+# --- end-to-end integration tests for validate + write ---
+
+
+@patch("weekforge.workflows.draft_week.load_user_profile")
+@patch("weekforge.workflows.draft_week.summaries_db")
+@patch("weekforge.workflows.draft_week.notion")
+@patch("weekforge.workflows.draft_week.run_accept_gate")
+@patch("weekforge.workflows.draft_week.run_with_metadata")
+def test_e2e_approve_validate_pass_write(mock_run_meta, mock_gate, mock_notion, mock_db, mock_profile, tmp_path):
+    """Full flow: overwrite_check → load_context → agent → accept(approve) → validate(pass) → write → done."""
+    from weekforge.workflows.draft_week import run_draft
+    from weekforge.models.user_profile import UserProfile
+    from weekforge.hitl import AcceptResult
+
+    store = CheckpointStore(str(tmp_path / "cp.sqlite"))
+
+    mock_notion.query.return_value = [
+        {"id": "t1", "properties": {"Name": {"type": "title", "title": [{"plain_text": "W15: Push"}]}}},
+    ]
+    mock_db.find_summary_row.return_value = None
+    mock_db.find_plan_state_row.return_value = (None, None)
+    mock_db.upsert_plan.return_value = "written-page-id"
+    mock_profile.return_value = UserProfile(page_id="up1", markdown="# Profile")
+
+    valid_plan = WeekPlan(
+        week_prefix="W15",
+        sessions=[
+            PlannedSession(name="Pull A", duration_min=85, focus_tags=["pull"]),
+            PlannedSession(name="Pull B", duration_min=85, focus_tags=["pull"]),
+            PlannedSession(name="Pull C", duration_min=85, focus_tags=["pull"]),
+            PlannedSession(name="Push A", duration_min=85, focus_tags=["push"]),
+            PlannedSession(name="Z2 Run", duration_min=75, focus_tags=["cardio", "z2"]),
+            PlannedSession(name="Z2 Hike", duration_min=90, focus_tags=["hike", "uphill"]),
+        ],
+    )
+    fake_result = MagicMock()
+    fake_result.output = valid_plan
+    mock_run_meta.return_value = (fake_result, MagicMock(input_tokens=0, output_tokens=0, latency_ms=0, model_used="t", cost_eur=0), [])
+    mock_gate.return_value = AcceptResult(step="validate", feedback=None)
+
+    run_draft("W15", "draft-week-W15", store)
+
+    mock_db.upsert_plan.assert_called_once()
+    rendered = mock_db.upsert_plan.call_args[0][1]
+    assert "Pull A" in rendered
+    # Checkpoint cleaned up on done
+    assert store.load("draft-week-W15") is None
+
+
+@patch("weekforge.workflows.draft_week.load_user_profile")
+@patch("weekforge.workflows.draft_week.summaries_db")
+@patch("weekforge.workflows.draft_week.notion")
+@patch("weekforge.workflows.draft_week.run_accept_gate")
+@patch("weekforge.workflows.draft_week.run_with_metadata")
+def test_e2e_validate_fail_reprompt_then_pass(mock_run_meta, mock_gate, mock_notion, mock_db, mock_profile, tmp_path):
+    """Validation fails first → re-prompt → second plan passes → write → done."""
+    from weekforge.workflows.draft_week import run_draft
+    from weekforge.models.user_profile import UserProfile
+    from weekforge.hitl import AcceptResult
+
+    store = CheckpointStore(str(tmp_path / "cp.sqlite"))
+
+    mock_notion.query.return_value = [
+        {"id": "t1", "properties": {"Name": {"type": "title", "title": [{"plain_text": "W15: Push"}]}}},
+    ]
+    mock_db.find_summary_row.return_value = None
+    mock_db.find_plan_state_row.return_value = (None, None)
+    mock_db.upsert_plan.return_value = "written-page-id"
+    mock_profile.return_value = UserProfile(page_id="up1", markdown="# Profile")
+
+    # First plan fails validation (1 pull, 2 push — ratio 0.5:1)
+    bad_plan = WeekPlan(
+        week_prefix="W15",
+        sessions=[
+            PlannedSession(name="Pull A", duration_min=85, focus_tags=["pull"]),
+            PlannedSession(name="Push A", duration_min=85, focus_tags=["push"]),
+            PlannedSession(name="Push B", duration_min=85, focus_tags=["push"]),
+            PlannedSession(name="Z2 Run", duration_min=75, focus_tags=["cardio", "z2"]),
+            PlannedSession(name="Z2 Hike", duration_min=90, focus_tags=["hike", "uphill"]),
+        ],
+    )
+    # Second plan passes (3 pull, 1 push, 2 conditioning)
+    good_plan = WeekPlan(
+        week_prefix="W15",
+        sessions=[
+            PlannedSession(name="Pull A", duration_min=85, focus_tags=["pull"]),
+            PlannedSession(name="Pull B", duration_min=85, focus_tags=["pull"]),
+            PlannedSession(name="Pull C", duration_min=85, focus_tags=["pull"]),
+            PlannedSession(name="Push A", duration_min=85, focus_tags=["push"]),
+            PlannedSession(name="Z2 Run", duration_min=75, focus_tags=["cardio", "z2"]),
+            PlannedSession(name="Z2 Hike", duration_min=90, focus_tags=["hike", "uphill"]),
+        ],
+    )
+
+    bad_result = MagicMock()
+    bad_result.output = bad_plan
+    good_result = MagicMock()
+    good_result.output = good_plan
+    meta = MagicMock(input_tokens=0, output_tokens=0, latency_ms=0, model_used="t", cost_eur=0)
+
+    # Call sequence: agent(bad) → accept(approve) → validate(fail) → agent(good) → accept(approve) → validate(pass) → write
+    mock_run_meta.side_effect = [
+        (bad_result, meta, []),
+        (good_result, meta, []),
+    ]
+    mock_gate.return_value = AcceptResult(step="validate", feedback=None)
+
+    run_draft("W15", "draft-week-W15", store)
+
+    assert mock_run_meta.call_count == 2
+    mock_db.upsert_plan.assert_called_once()
+    # Second agent call should include validation feedback in prompt
+    second_prompt = mock_run_meta.call_args_list[1][0][1]
+    assert "pull:push" in second_prompt
