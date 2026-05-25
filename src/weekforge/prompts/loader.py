@@ -11,6 +11,7 @@ class Prompt(StrEnum):
     UPDATE_PLAN_STATE_TASK = "update-plan-state-task.md"
     PROGRESSION_PROTOCOL = "progression-protocol.md"
     CAVEMAN_LITE_DIRECTIVE = "caveman-lite-directive.md"
+    DRAFT_WEEK_TASK = "draft-week-task.md"
 
 
 @functools.cache
