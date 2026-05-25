@@ -14,7 +14,7 @@ from weekforge.models.workflow_state import DraftWeekState
 @patch("weekforge.workflows.draft_week.load_user_profile")
 @patch("weekforge.workflows.draft_week.notion")
 def test_overwrite_check_no_existing_row(mock_notion, mock_profile, mock_run_meta, mock_gate, mock_validator, tmp_path):
-    """No summary row → skip overwrite, load context, agent runs, hits write stub."""
+    """No summary row → skip overwrite, load context, agent runs, write completes."""
     from weekforge.workflows.draft_week import run_draft
     from weekforge.models.user_profile import UserProfile
     from weekforge.hitl import AcceptResult
@@ -35,10 +35,11 @@ def test_overwrite_check_no_existing_row(mock_notion, mock_profile, mock_run_met
     with patch("weekforge.workflows.draft_week.summaries_db") as mock_db:
         mock_db.find_summary_row.return_value = None
         mock_db.find_plan_state_row.return_value = (None, None)
-        with pytest.raises(RuntimeError, match="Not yet implemented.*write"):
-            run_draft("W15", "draft-week-W15", store)
+        mock_db.upsert_plan.return_value = "written-page-id"
+        run_draft("W15", "draft-week-W15", store)
 
     mock_db.find_summary_row.assert_called()
+    assert store.load("draft-week-W15") is None
 
 
 @patch("weekforge.tools.week_plan_validator.validate_week_plan", return_value=(True, None))
@@ -47,7 +48,7 @@ def test_overwrite_check_no_existing_row(mock_notion, mock_profile, mock_run_met
 @patch("weekforge.workflows.draft_week.load_user_profile")
 @patch("weekforge.workflows.draft_week.notion")
 def test_overwrite_check_existing_row_empty_plan(mock_notion, mock_profile, mock_run_meta, mock_gate, mock_validator, tmp_path):
-    """Row exists but Plan empty → skip overwrite, load context, agent runs, hits write stub."""
+    """Row exists but Plan empty → skip overwrite, load context, agent runs, write completes."""
     from weekforge.workflows.draft_week import run_draft
     from weekforge.models.user_profile import UserProfile
     from weekforge.hitl import AcceptResult
@@ -70,8 +71,10 @@ def test_overwrite_check_existing_row_empty_plan(mock_notion, mock_profile, mock
         mock_db.read_plan_property.return_value = None
         mock_db.read_summary_body.return_value = None
         mock_db.find_plan_state_row.return_value = (None, None)
-        with pytest.raises(RuntimeError, match="Not yet implemented.*write"):
-            run_draft("W15", "draft-week-W15", store)
+        mock_db.upsert_plan.return_value = "written-page-id"
+        run_draft("W15", "draft-week-W15", store)
+
+    assert store.load("draft-week-W15") is None
 
 
 @patch("weekforge.tools.week_plan_validator.validate_week_plan", return_value=(True, None))
@@ -81,7 +84,7 @@ def test_overwrite_check_existing_row_empty_plan(mock_notion, mock_profile, mock
 @patch("weekforge.workflows.draft_week.notion")
 @patch("weekforge.workflows.draft_week.hitl_confirm")
 def test_overwrite_check_existing_plan_approve(mock_confirm, mock_notion, mock_profile, mock_run_meta, mock_gate, mock_validator, tmp_path):
-    """Row has Plan → HITL approve → load_context → agent runs → hits write stub."""
+    """Row has Plan → HITL approve → load_context → agent runs → write completes."""
     from weekforge.workflows.draft_week import run_draft
     from weekforge.models.user_profile import UserProfile
     from weekforge.hitl import AcceptResult
@@ -105,10 +108,11 @@ def test_overwrite_check_existing_plan_approve(mock_confirm, mock_notion, mock_p
         mock_db.read_plan_property.return_value = "Push day + Hinge day\nConditioning x2"
         mock_db.read_summary_body.return_value = None
         mock_db.find_plan_state_row.return_value = (None, None)
-        with pytest.raises(RuntimeError, match="Not yet implemented.*write"):
-            run_draft("W15", "draft-week-W15", store)
+        mock_db.upsert_plan.return_value = "written-page-id"
+        run_draft("W15", "draft-week-W15", store)
 
     mock_confirm.assert_called_once()
+    assert store.load("draft-week-W15") is None
 
 
 @patch("weekforge.workflows.draft_week.hitl_confirm")
@@ -178,8 +182,8 @@ def test_overwrite_check_plan_preview_truncated(mock_notion, mock_profile, tmp_p
                         mock_db.read_plan_property.return_value = long_plan
                         mock_db.read_summary_body.return_value = None
                         mock_db.find_plan_state_row.return_value = (None, None)
-                        with pytest.raises(RuntimeError, match="Not yet implemented.*write"):
-                            run_draft("W15", "draft-week-W15", store)
+                        mock_db.upsert_plan.return_value = "written-page-id"
+                        run_draft("W15", "draft-week-W15", store)
 
     call_kwargs = mock_confirm.call_args
     context_text = call_kwargs.kwargs.get("context", call_kwargs[1].get("context", ""))
@@ -189,16 +193,6 @@ def test_overwrite_check_plan_preview_truncated(mock_notion, mock_profile, tmp_p
     assert "Line 10" not in context_text
 
 
-def test_stub_steps_raise():
-    """Remaining future steps raise RuntimeError."""
-    from weekforge.workflows.draft_week import _step_write
-
-    state = DraftWeekState(week_prefix="W15")
-    cost = RunCost()
-
-    with pytest.raises(RuntimeError, match="Not yet implemented"):
-        _step_write(state, cost)
-
 
 @patch("weekforge.tools.week_plan_validator.validate_week_plan", return_value=(True, None))
 @patch("weekforge.workflows.draft_week.run_accept_gate")
@@ -206,7 +200,7 @@ def test_stub_steps_raise():
 @patch("weekforge.workflows.draft_week.load_user_profile")
 @patch("weekforge.workflows.draft_week.notion")
 def test_run_draft_creates_checkpoint(mock_notion, mock_profile, mock_run_meta, mock_gate, mock_validator, tmp_path):
-    """run_draft saves checkpoint before first step dispatch."""
+    """run_draft saves checkpoint during execution and cleans it up on done."""
     from weekforge.workflows.draft_week import run_draft
     from weekforge.models.user_profile import UserProfile
     from weekforge.hitl import AcceptResult
@@ -227,12 +221,10 @@ def test_run_draft_creates_checkpoint(mock_notion, mock_profile, mock_run_meta, 
     with patch("weekforge.workflows.draft_week.summaries_db") as mock_db:
         mock_db.find_summary_row.return_value = None
         mock_db.find_plan_state_row.return_value = (None, None)
-        with pytest.raises(RuntimeError, match="Not yet implemented.*write"):
-            run_draft("W15", "draft-week-W15", store)
+        mock_db.upsert_plan.return_value = "written-page-id"
+        run_draft("W15", "draft-week-W15", store)
 
-    rec = store.load("draft-week-W15")
-    assert rec is not None
-    assert rec.workflow == "draft_week"
+    assert store.load("draft-week-W15") is None
 
 
 @patch("weekforge.tools.week_plan_validator.validate_week_plan", return_value=(True, None))
@@ -241,7 +233,7 @@ def test_run_draft_creates_checkpoint(mock_notion, mock_profile, mock_run_meta, 
 @patch("weekforge.workflows.draft_week.load_user_profile")
 @patch("weekforge.workflows.draft_week.notion")
 def test_run_draft_resumes_from_checkpoint(mock_notion, mock_profile, mock_run_meta, mock_gate, mock_validator, tmp_path):
-    """Resume dispatches to the saved step (load_context → agent runs → hits write stub)."""
+    """Resume dispatches to the saved step (load_context → agent runs → write completes)."""
     from weekforge.workflows.draft_week import run_draft
     from weekforge.models.user_profile import UserProfile
     from weekforge.hitl import AcceptResult
@@ -264,8 +256,10 @@ def test_run_draft_resumes_from_checkpoint(mock_notion, mock_profile, mock_run_m
     with patch("weekforge.workflows.draft_week.summaries_db") as mock_db:
         mock_db.find_summary_row.return_value = None
         mock_db.find_plan_state_row.return_value = (None, None)
-        with pytest.raises(RuntimeError, match="Not yet implemented.*write"):
-            run_draft("W15", "draft-week-W15", store)
+        mock_db.upsert_plan.return_value = "written-page-id"
+        run_draft("W15", "draft-week-W15", store)
+
+    assert store.load("draft-week-W15") is None
 
 
 @patch("weekforge.workflows.draft_week.load_user_profile")
@@ -425,7 +419,7 @@ def test_load_context_feedback_window_ordering(mock_notion, mock_db, mock_profil
 @patch("weekforge.workflows.draft_week.summaries_db")
 @patch("weekforge.workflows.draft_week.notion")
 def test_load_context_end_to_end_through_workflow(mock_notion, mock_db, mock_profile, mock_run_meta, mock_gate, mock_validator, tmp_path):
-    """load_context step runs through the full workflow, agent runs, hits write stub."""
+    """load_context step runs through the full workflow, agent runs, write completes."""
     from weekforge.workflows.draft_week import run_draft
     from weekforge.models.user_profile import UserProfile
     from weekforge.hitl import AcceptResult
@@ -437,6 +431,7 @@ def test_load_context_end_to_end_through_workflow(mock_notion, mock_db, mock_pro
     ]
     mock_db.find_summary_row.return_value = None  # overwrite_check + feedback window
     mock_db.find_plan_state_row.return_value = (None, None)
+    mock_db.upsert_plan.return_value = "written-page-id"
 
     mock_profile.return_value = UserProfile(page_id="up1", markdown="# Profile")
 
@@ -446,8 +441,9 @@ def test_load_context_end_to_end_through_workflow(mock_notion, mock_db, mock_pro
     mock_run_meta.return_value = (fake_result, MagicMock(input_tokens=0, output_tokens=0, latency_ms=0, model_used="t", cost_eur=0), [])
     mock_gate.return_value = AcceptResult(step="validate", feedback=None)
 
-    with pytest.raises(RuntimeError, match="Not yet implemented.*write"):
-        run_draft("W15", "draft-week-W15", store)
+    run_draft("W15", "draft-week-W15", store)
+
+    assert store.load("draft-week-W15") is None
 
 
 # --- feedback window edge cases for early weeks ---
@@ -704,7 +700,7 @@ def test_step_agent_accumulates_calls(mock_notion, mock_db, mock_profile):
 @patch("weekforge.workflows.draft_week.run_accept_gate")
 @patch("weekforge.workflows.draft_week.run_with_metadata")
 def test_accept_approve_transitions_to_validate(mock_run_meta, mock_gate, mock_notion, mock_db, mock_profile, mock_validator, tmp_path):
-    """Accept → approve → validate passes → hits write stub."""
+    """Accept → approve → validate passes → write completes."""
     from weekforge.workflows.draft_week import run_draft
     from weekforge.models.user_profile import UserProfile
     from weekforge.hitl import AcceptResult
@@ -716,6 +712,7 @@ def test_accept_approve_transitions_to_validate(mock_run_meta, mock_gate, mock_n
     ]
     mock_db.find_summary_row.return_value = None
     mock_db.find_plan_state_row.return_value = (None, None)
+    mock_db.upsert_plan.return_value = "written-page-id"
     mock_profile.return_value = UserProfile(page_id="up1", markdown="# Profile")
 
     fake_plan = WeekPlan(
@@ -728,12 +725,12 @@ def test_accept_approve_transitions_to_validate(mock_run_meta, mock_gate, mock_n
 
     mock_gate.return_value = AcceptResult(step="validate", feedback=None)
 
-    with pytest.raises(RuntimeError, match="Not yet implemented.*write"):
-        run_draft("W15", "draft-week-W15", store)
+    run_draft("W15", "draft-week-W15", store)
 
     mock_gate.assert_called_once()
     gate_kwargs = mock_gate.call_args
     assert gate_kwargs.kwargs.get("approved_step", gate_kwargs[1].get("approved_step")) == "validate"
+    assert store.load("draft-week-W15") is None
 
 
 @patch("weekforge.workflows.draft_week.load_user_profile")
@@ -922,3 +919,80 @@ def test_validate_pass_after_retry_clears_warning():
 
     assert result == "write"
     assert state.validation_warning is None
+
+
+# --- write step tests ---
+
+
+@patch("weekforge.workflows.draft_week.summaries_db")
+def test_write_calls_upsert_and_returns_done(mock_db):
+    """Write step renders plan, calls upsert_plan, stores page_id, returns 'done'."""
+    from weekforge.workflows.draft_week import _step_write
+
+    plan = WeekPlan(
+        week_prefix="W15",
+        sessions=[
+            PlannedSession(name="Pull A", duration_min=85, focus_tags=["pull"]),
+            PlannedSession(name="Z2 Run", duration_min=75, focus_tags=["cardio", "z2"]),
+        ],
+        adjustments=["test adjustment"],
+    )
+    state = DraftWeekState(week_prefix="W15", step="write", last_output=plan)
+    cost = RunCost()
+
+    mock_db.upsert_plan.return_value = "page-123"
+
+    result = _step_write(state, cost)
+
+    assert result == "done"
+    assert state.written_page_id == "page-123"
+    mock_db.upsert_plan.assert_called_once()
+    call_args = mock_db.upsert_plan.call_args
+    assert call_args[0][0] == "W15"
+    rendered = call_args[0][1]
+    assert "Pull A" in rendered
+    assert "Z2 Run" in rendered
+    assert "test adjustment" in rendered
+
+
+@patch("weekforge.workflows.draft_week.summaries_db")
+def test_write_truncates_long_plan(mock_db):
+    """Plan exceeding 2000 chars is truncated with marker."""
+    from weekforge.workflows.draft_week import _step_write
+
+    sessions = [
+        PlannedSession(name=f"Session {i} with a long name for padding purposes", duration_min=60 + i, focus_tags=["pull"])
+        for i in range(1, 30)
+    ]
+    plan = WeekPlan(week_prefix="W15", sessions=sessions, adjustments=["a" * 500])
+    state = DraftWeekState(week_prefix="W15", step="write", last_output=plan)
+    cost = RunCost()
+
+    mock_db.upsert_plan.return_value = "page-456"
+
+    _step_write(state, cost)
+
+    rendered = mock_db.upsert_plan.call_args[0][1]
+    assert len(rendered) <= 2000
+    assert "[truncated]" in rendered
+
+
+@patch("weekforge.workflows.draft_week.summaries_db")
+def test_write_idempotent_second_call(mock_db):
+    """Calling write twice with same plan is safe (upsert semantics)."""
+    from weekforge.workflows.draft_week import _step_write
+
+    plan = WeekPlan(
+        week_prefix="W15",
+        sessions=[PlannedSession(name="Pull A", duration_min=85, focus_tags=["pull"])],
+    )
+
+    mock_db.upsert_plan.return_value = "page-789"
+
+    for _ in range(2):
+        state = DraftWeekState(week_prefix="W15", step="write", last_output=plan)
+        cost = RunCost()
+        result = _step_write(state, cost)
+        assert result == "done"
+
+    assert mock_db.upsert_plan.call_count == 2

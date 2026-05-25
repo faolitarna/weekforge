@@ -176,8 +176,24 @@ def _step_validate(state: DraftWeekState, cost: RunCost) -> str | None:
     return "accept"
 
 
+_NOTION_RICH_TEXT_LIMIT = 2000
+
+
 def _step_write(state: DraftWeekState, cost: RunCost) -> str | None:
-    raise RuntimeError("Not yet implemented: write (step 2d)")
+    assert state.last_output is not None
+    from weekforge.tools.week_plan_renderer import render_week_plan
+
+    rendered = render_week_plan(state.last_output)
+
+    if len(rendered) > _NOTION_RICH_TEXT_LIMIT:
+        _verbose(f"write: plan text {len(rendered)} chars, truncating to {_NOTION_RICH_TEXT_LIMIT}")
+        rendered = rendered[: _NOTION_RICH_TEXT_LIMIT - len("[truncated]")] + "[truncated]"
+
+    page_id = summaries_db.upsert_plan(state.week_prefix, rendered)
+    state.written_page_id = page_id
+
+    _console.print(f"[green]Plan written to Notion ({page_id})[/green]")
+    return "done"
 
 
 def run_draft(week_prefix: str, thread_id: str, store: CheckpointStore) -> None:
