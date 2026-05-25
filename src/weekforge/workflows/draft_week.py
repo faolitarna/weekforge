@@ -159,6 +159,11 @@ def _step_validate(state: DraftWeekState, cost: RunCost) -> str | None:
     from weekforge.tools.week_plan_validator import validate_week_plan
 
     assert state.last_output is not None
+
+    # User already saw the warning and approved — skip re-validation, force write.
+    if state.validation_warning is not None:
+        return "write"
+
     passed, diff = validate_week_plan(state.last_output)
 
     if passed:

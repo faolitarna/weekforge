@@ -921,6 +921,32 @@ def test_validate_pass_after_retry_clears_warning():
     assert state.validation_warning is None
 
 
+def test_validate_override_after_warning_skips_to_write():
+    """User approved despite warning → validate again → skip directly to write."""
+    from weekforge.workflows.draft_week import _step_validate
+
+    plan = WeekPlan(
+        week_prefix="W15",
+        sessions=[
+            PlannedSession(name="Pull A", duration_min=85, focus_tags=["pull"]),
+            PlannedSession(name="Push A", duration_min=85, focus_tags=["push"]),
+            PlannedSession(name="Push B", duration_min=85, focus_tags=["push"]),
+            PlannedSession(name="Z2 Run", duration_min=75, focus_tags=["cardio", "z2"]),
+            PlannedSession(name="Z2 Hike", duration_min=90, focus_tags=["hike", "uphill"]),
+        ],
+    )
+    state = DraftWeekState(
+        week_prefix="W15", step="validate", last_output=plan,
+        validation_retry_used=True,
+        validation_warning="pull:push=1.0:2.0 (previous warning)",
+    )
+    cost = RunCost()
+
+    result = _step_validate(state, cost)
+
+    assert result == "write"
+
+
 # --- write step tests ---
 
 
