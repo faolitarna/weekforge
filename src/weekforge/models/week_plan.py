@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+# Closed set validated by Pydantic — agent cannot emit an arbitrary tag.
+# Add new tags here first; the LLM prompt references this vocabulary.
 FocusTag = Literal[
     # Movement
     "push", "pull", "squat", "hinge", "core", "carry",
@@ -22,5 +24,5 @@ class PlannedSession(BaseModel):
 
 class WeekPlan(BaseModel):
     week_prefix: str
-    sessions: list[PlannedSession]
+    sessions: list[PlannedSession]  # empty list allowed here; 8-12 session rule enforced in step 2d
     adjustments: list[str] = Field(default_factory=list)

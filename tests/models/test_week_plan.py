@@ -94,3 +94,76 @@ def test_week_plan_empty_sessions_allowed():
 
     plan = WeekPlan(week_prefix="W15", sessions=[])
     assert plan.sessions == []
+
+
+@pytest.mark.parametrize("bad_tag", [
+    "nonexistent",
+    "Push",          # case-sensitive: "Push" is not "push"
+    "Z2",            # "Z2" is not "z2"
+    "zone2",
+    "strength",
+    "",
+    " push",         # leading space
+])
+def test_invalid_focus_tag_variants(bad_tag):
+    """Tag validation rejects any string outside the controlled vocabulary."""
+    from weekforge.models.week_plan import PlannedSession
+
+    with pytest.raises(ValidationError):
+        PlannedSession(name="Test", duration_min=60, focus_tags=[bad_tag])
+
+
+def test_mixed_valid_and_invalid_tags_rejected():
+    """A single invalid tag in a list with valid tags must still fail."""
+    from weekforge.models.week_plan import PlannedSession
+
+    with pytest.raises(ValidationError):
+        PlannedSession(name="Test", duration_min=60, focus_tags=["push", "BOGUS", "core"])
+
+
+def test_duration_min_string_coercion():
+    """Pydantic coerces string integers to int — LLM may produce quoted numbers."""
+    from weekforge.models.week_plan import PlannedSession
+
+    s = PlannedSession(name="Run", duration_min="45", focus_tags=["run"])  # type: ignore[arg-type]
+    assert s.duration_min == 45
+    assert isinstance(s.duration_min, int)
+
+
+def test_duration_min_negative_allowed_by_model():
+    """Model has no lower bound on duration_min — negative values are accepted.
+
+    Documenting the current contract: range enforcement belongs in step-2d validation,
+    not the Pydantic model itself.
+    """
+    from weekforge.models.week_plan import PlannedSession
+
+    s = PlannedSession(name="Oops", duration_min=-1, focus_tags=["recovery"])
+    assert s.duration_min == -1
+
+
+def test_empty_focus_tags_list_allowed_by_model():
+    """Model permits empty focus_tags; step-2d validation is responsible for min-count checks."""
+    from weekforge.models.week_plan import PlannedSession
+
+    s = PlannedSession(name="Mystery Session", duration_min=60, focus_tags=[])
+    assert s.focus_tags == []
+
+
+def test_duplicate_focus_tags_preserved():
+    """Duplicate tags are not deduplicated — model preserves insertion order faithfully."""
+    from weekforge.models.week_plan import PlannedSession
+
+    s = PlannedSession(name="Repeat", duration_min=60, focus_tags=["z2", "z2", "cardio"])
+    assert s.focus_tags == ["z2", "z2", "cardio"]
+
+
+def test_week_plan_adjustments_independent_across_instances():
+    """Default mutable list is not shared between instances (Field default_factory)."""
+    from weekforge.models.week_plan import PlannedSession, WeekPlan
+
+    s = PlannedSession(name="A", duration_min=60, focus_tags=["pull"])
+    plan_a = WeekPlan(week_prefix="W01", sessions=[s])
+    plan_b = WeekPlan(week_prefix="W02", sessions=[s])
+    plan_a.adjustments.append("mutation")
+    assert plan_b.adjustments == [], "adjustments lists must not be shared between instances"
