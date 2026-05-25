@@ -4,6 +4,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from weekforge.models.llm_call_cost import CallMetadata
+from weekforge.models.week_plan import WeekPlan
 from weekforge.models.week_summary import WeekSummary
 
 
@@ -32,7 +33,7 @@ class DraftWeekState(BaseModel):
     step: str = "overwrite_check"
     messages_json: list[dict[str, Any]] = Field(default_factory=list)
     calls: list[CallMetadata] = Field(default_factory=list)
-    last_output: Any = None
+    last_output: WeekPlan | None = None
     pending_feedback: str | None = None
     validation_retry_used: bool = False
     validation_warning: str | None = None

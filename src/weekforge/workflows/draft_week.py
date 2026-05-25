@@ -1,8 +1,10 @@
+from pydantic_ai.messages import ModelMessagesTypeAdapter
 from rich.console import Console
 
+from weekforge.agents.agent_run_with_metadata import run_with_metadata
 from weekforge.checkpoint import CheckpointStore
 from weekforge.config.user_profile_loader import load_user_profile
-from weekforge.hitl import hitl_confirm
+from weekforge.hitl import hitl_confirm, run_accept_gate
 from weekforge.models.llm_call_cost import RunCost
 from weekforge.models.workflow_state import DraftWeekState
 from weekforge.tools import notion_api_gateway as notion
@@ -13,6 +15,7 @@ from weekforge.workflows.runner import StepFn, run_workflow
 
 _console = Console()
 WORKFLOW = "draft_week"
+MAX_ITERATIONS = 3
 
 
 def _verbose(msg: str) -> None:
@@ -90,11 +93,66 @@ def _step_load_context(state: DraftWeekState, cost: RunCost) -> str | None:
 
 
 def _step_agent(state: DraftWeekState, cost: RunCost) -> str | None:
-    raise RuntimeError("Not yet implemented: agent (step 2c)")
+    from weekforge.agents.draft_week_agent import (
+        DraftWeekDeps,
+        WeekFeedbackRow,
+        derive_active_flare,
+        draft_week_agent,
+    )
+    from weekforge.config.env import settings
 
+    _verbose(f"agent: rebuilding context for {state.week_prefix}…")
+    all_templates = notion.query(database_id=settings.notion_db_training_templates)
+    template_sessions = [p for p in all_templates if get_page_title(p).startswith(state.week_prefix)]
 
-def _step_accept(state: DraftWeekState, cost: RunCost) -> str | None:
-    raise RuntimeError("Not yet implemented: accept (step 2c)")
+    week_num = int(state.week_prefix[1:])
+    feedback_window: list[WeekFeedbackRow] = []
+    for prev_week in range(week_num - 1, max(week_num - 4, 0), -1):
+        prev_prefix = f"W{prev_week:02d}"
+        row = summaries_db.find_summary_row(prev_prefix)
+        if row is None:
+            continue
+        feedback_window.append(WeekFeedbackRow(
+            week_prefix=prev_prefix,
+            plan_md=summaries_db.read_plan_property(row),
+            summary_text=summaries_db.read_summary_body(row),
+        ))
+    feedback_window.reverse()
+
+    plan_state = parse_plan_state(state.plan_state_raw) if state.plan_state_raw else None
+    profile = load_user_profile()
+    active_flare = derive_active_flare(feedback_window, plan_state)
+
+    deps = DraftWeekDeps(
+        week_prefix=state.week_prefix,
+        template_sessions=template_sessions,
+        feedback_window=feedback_window,
+        plan_state=plan_state,
+        plan_state_raw=state.plan_state_raw,
+        user_profile=profile,
+        active_flare=active_flare,
+        bootstrap=state.is_bootstrap or False,
+    )
+
+    prev = ModelMessagesTypeAdapter.validate_python(state.messages_json) if state.messages_json else None
+
+    prompt = f"Draft week plan for {state.week_prefix}."
+    if state.pending_feedback:
+        prompt += f"\nUser feedback: {state.pending_feedback}"
+
+    iteration = len(state.calls) + 1
+    with _console.status(f"[bold]Drafting week plan… (attempt {iteration})[/bold]", spinner="bouncingBar"):
+        result, meta, new_messages = run_with_metadata(
+            draft_week_agent, prompt, deps=deps, message_history=prev,
+        )
+
+    state.last_output = result.output
+    state.messages_json = ModelMessagesTypeAdapter.dump_python(new_messages, mode="json")
+    state.calls.append(meta)
+    cost.add(meta)
+    _verbose(f"agent: {meta.input_tokens} input / {meta.output_tokens} output tokens")
+    state.pending_feedback = None
+    return "accept"
 
 
 def _step_validate(state: DraftWeekState, cost: RunCost) -> str | None:
@@ -144,11 +202,36 @@ def run_draft(week_prefix: str, thread_id: str, store: CheckpointStore) -> None:
             return "load_context"
         return None
 
+    def step_accept(state: DraftWeekState, cost: RunCost) -> str | None:
+        assert state.last_output is not None
+        from weekforge.tools.week_plan_renderer import render_week_plan
+
+        def render_fn() -> str:
+            return render_week_plan(state.last_output)
+
+        result = run_accept_gate(
+            render_fn=render_fn,
+            approved_step="validate",
+            cost=cost,
+            calls=state.calls,
+            max_iterations=MAX_ITERATIONS,
+            store=store,
+            thread_id=thread_id,
+            workflow=WORKFLOW,
+            step="accept",
+            state=state,
+        )
+
+        if result.feedback:
+            state.pending_feedback = result.feedback
+
+        return result.step
+
     steps: dict[str, StepFn[DraftWeekState]] = {
         "overwrite_check": step_overwrite_check,
         "load_context": _step_load_context,
         "agent": _step_agent,
-        "accept": _step_accept,
+        "accept": step_accept,
         "validate": _step_validate,
         "write": _step_write,
     }
