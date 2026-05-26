@@ -10,19 +10,69 @@ Do not repeat this file inside agents.
 - Project-specific agents: `.agents/agents/<name>/<name>.md`
 - Lookup order: `.agents/` first, then `.dev-agents/`. Local wins on collision.
 
-## Tier split
+## Workflow
+
+See `docs/development_workflow.md` for the full skill-based workflow (Matt Pocock PM skills + superpowers implementation).
+
+### Active agents in skill workflow
+
+These agents run after superpowers execution and before final review:
+
+#### `feature-tester`
+- Purpose: write focused tests for changed behavior.
+- Owns: test plan, unit tests, small justified integration tests, coverage summary.
+- Does not own: implementation review or redesign.
+
+#### `documentation-developer`
+- Purpose: add minimal code documentation.
+- Owns: non-obvious contract docs, local why-comments, comment cleanup.
+- Does not own: specs, implementation, tutorials, or review.
+
+### Legacy agents (optional)
+
+These agents support the older spec-driven flow without skills. Still usable when the full skill workflow is overkill.
+
+Legacy flow: `specs-facilitator -> specs-developer -> feature-developer -> feature-tester -> code-reviewer -> documentation-developer -> commit`
+
+#### `specs-facilitator`
+- Purpose: clarify one spec draft before formal spec writing.
+- Owns: clarification questions, decision capture, open-question tracking, readiness check.
+
+#### `specs-developer`
+- Purpose: write one bounded implementation spec.
+- Owns: scope, file list, interfaces, data contracts, workflow, tier split, failure modes, acceptance criteria.
+
+#### `feature-developer`
+- Purpose: implement one bounded spec step.
+- Owns: implementation and local validation.
+
+#### `code-reviewer`
+- Purpose: review changed scope before commit.
+- Owns: spec compliance, correctness, architectural fit, maintainability, test adequacy.
+
+#### Legacy handoff rules
+
+- Start with a spec draft based on `spec-template.md`.
+- If `Open questions` contains meaningful ambiguity, run `specs-facilitator` first.
+- When ambiguity is low and decisions are captured, run `specs-developer`.
+- Downstream agents treat the finalized spec as source of truth.
+
+## Task complexity tier split 
 
 - Tier 0 = deterministic Python (parsing, validation, CRUD, formatting)
-- Tier 1 = deterministic + tool calls (external I/O, Notion, filesystem)
-- Tier 2 = LLM reasoning (interpretation, summarization, recommendation)
+- Tier 1 = fast/cheap LLM for micro-classification (section heading classification)
+- Tier 2 = heavy cognitive LLM (planning, summarization, trend synthesis)
 
 ## Layer boundaries
 
-- CLI = entry point
-- workflows = orchestration
-- tools = I/O + deterministic logic
-- models = structured data
-- agents = LLM prompt + output contract
+- `cli` = entry point
+- `workflows` = orchestration + step functions
+- `tools` = I/O + deterministic logic (Notion gateway, validators, renderers)
+- `models` = structured data (Pydantic models, workflow state)
+- `agents` = LLM prompt + output contract
+- `prompts` = LLM instruction text (markdown files, never inline in Python)
+- `config` = user profile, env settings
+- `checkpoint` = SQLite-persisted workflow state for quit-and-resume
 
 ## Repo rules
 
@@ -49,67 +99,6 @@ Do not repeat this file inside agents.
 - Avoid framework ceremony.
 - Fail loudly at boundaries.
 - No silent swallowing of meaningful errors.
-
-## Agent list
-
-### `specs-facilitator`
-- Purpose: clarify one spec draft before formal spec writing.
-- Owns: clarification questions, decision capture, open-question tracking, readiness check.
-- Edits only: `Status`, `Goal`, `Decisions`, `Open questions`, `Out of scope`.
-- Does not own: full spec writing, code, tests, review, docs.
-
-### `specs-developer`
-- Purpose: write one bounded implementation spec.
-- Owns: scope, file list, interfaces, data contracts, workflow, tier split, failure modes, acceptance criteria.
-- Reads existing spec draft and its discussion sections.
-- If important ambiguity remains in `Open questions`, stop and hand back to `specs-facilitator`.
-- Does not guess.
-
-### `feature-developer`
-- Purpose: implement one bounded spec step.
-- Owns: implementation and local validation.
-- Does not own: spec writing, review, broad documentation.
-
-### `feature-tester`
-- Purpose: write focused tests for changed behavior.
-- Owns: test plan, unit tests, small justified integration tests, coverage summary.
-- Does not own: implementation review or redesign.
-
-### `code-reviewer`
-- Purpose: review changed scope before commit.
-- Owns: spec compliance, correctness, architectural fit, maintainability, test adequacy.
-- Does not own: rewriting code or inventing requirements.
-
-### `documentation-developer`
-- Purpose: add minimal code documentation.
-- Owns: non-obvious contract docs, local why-comments, comment cleanup.
-- Does not own: specs, implementation, tutorials, or review.
-
-## Workflow
-
-Default flow:
-
-`specs-facilitator -> specs-developer -> feature-developer -> feature-tester -> code-reviewer -> documentation-developer -> commit`
-
-## Handoff rules
-
-- Start with a spec draft based on `spec-template.md`.
-- If `Open questions` contains meaningful ambiguity, run `specs-facilitator` first.
-- When ambiguity is low and decisions are captured, run `specs-developer`.
-- `specs-developer` must leave `Open questions` as `None` or explicitly hand the draft back for more discussion.
-- Downstream agents treat the finalized spec as source of truth.
-
-## Spec file rule
-
-Use one spec file as the working document.
-Do not create a separate discussion artifact.
-Discussion happens inside the spec draft.
-
-Recommended top sections in every spec:
-- `Status`
-- `Goal`
-- `Decisions`
-- `Open questions`
 
 ## Working style
 

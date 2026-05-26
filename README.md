@@ -36,6 +36,10 @@ This project uses [uv](https://github.com/astral-sh/uv) as its package manager a
    uv run weekforge --help
    ```
 
+## Development Workflow
+
+This project uses a skill-based development workflow combining project management skills (PRDs, issue tracking, triage) with automated implementation skills (TDD plans, subagent execution, code review). See [`docs/development_workflow.md`](docs/development_workflow.md) for the full guide.
+
 ## Development Commands
 
 - **Linting & Formatting**: `uv run ruff check .`
