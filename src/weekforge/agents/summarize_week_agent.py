@@ -1,4 +1,3 @@
-import json
 import logging
 from dataclasses import dataclass
 
@@ -21,7 +20,7 @@ class SummarizeDeps:
     implicit_feedback: ImplicitFeedback
     plan_adherence: PlanAdherence | None
     tier0_summary_json: str
-    raw_sessions_json: str = "[]"
+    raw_sessions_markdown: str = ""
     planned_plan_markdown: str | None = None
     plan_state_raw: str | None = None
 
@@ -47,32 +46,9 @@ def _inject_tier0_facts(ctx: RunContext[SummarizeDeps]) -> str:
     )
 
 
-_HEADING_TYPES = {"heading_1", "heading_2", "heading_3"}
-
-
 @summarize_week_agent.instructions
 def _inject_raw_sessions(ctx: RunContext[SummarizeDeps]) -> str:
-    try:
-        sessions = json.loads(ctx.deps.raw_sessions_json)
-    except json.JSONDecodeError:
-        _logger.warning("Failed to parse raw_sessions_json — injecting empty section")
-        return ""
-    if not sessions:
-        return ""
-    lines = ["## Raw Session Blocks (source for exercise_log, cardio_log, climbing_log)\n"]
-    for session in sessions:
-        lines.append(f"### {session['name']}")
-        comments = session.get("comments", [])
-        lines.append(f"Comments: {', '.join(comments) if comments else 'none'}\n")
-        for block in session.get("blocks", []):
-            bt = block["block_type"]
-            if bt in _HEADING_TYPES:  # only heading + to_do — other types add noise without extraction value
-                lines.append(block["text"])
-            elif bt == "to_do":
-                check = "x" if block.get("checked") else " "
-                lines.append(f"- [{check}] {block['text']}")
-        lines.append("")
-    return "\n".join(lines)
+    return ctx.deps.raw_sessions_markdown
 
 
 @summarize_week_agent.instructions

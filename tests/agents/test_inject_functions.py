@@ -1,4 +1,3 @@
-import json
 from unittest.mock import MagicMock
 
 from weekforge.agents.summarize_week_agent import (
@@ -21,7 +20,7 @@ def _make_deps(**overrides) -> SummarizeDeps:
         ),
         plan_adherence=None,
         tier0_summary_json="{}",
-        raw_sessions_json="[]",
+        raw_sessions_markdown="",
         planned_plan_markdown=None,
         plan_state_raw=None,
     )
@@ -36,74 +35,25 @@ def _make_ctx(deps: SummarizeDeps) -> MagicMock:
 
 
 class TestInjectRawSessions:
-    def test_empty_sessions_returns_empty(self):
-        ctx = _make_ctx(_make_deps(raw_sessions_json="[]"))
+    def test_empty_returns_empty(self):
+        ctx = _make_ctx(_make_deps(raw_sessions_markdown=""))
         assert _inject_raw_sessions(ctx) == ""
 
-    def test_malformed_json_returns_empty(self):
-        ctx = _make_ctx(_make_deps(raw_sessions_json="{bad json"))
-        assert _inject_raw_sessions(ctx) == ""
-
-    def test_filters_to_heading_and_todo_only(self):
-        sessions = [
-            {
-                "name": "Upper A",
-                "page_id": "p1",
-                "blocks": [
-                    {"block_type": "heading_2", "text": "Warmup", "checked": None},
-                    {"block_type": "to_do", "text": "Bar Hangs 3x30s", "checked": True},
-                    {"block_type": "paragraph", "text": "Some note", "checked": None},
-                    {"block_type": "to_do", "text": "Side Planks 3x20s", "checked": False},
-                    {"block_type": "divider", "text": "", "checked": None},
-                ],
-                "comments": ["felt good"],
-            }
-        ]
-        ctx = _make_ctx(_make_deps(raw_sessions_json=json.dumps(sessions)))
+    def test_returns_pre_formatted_markdown(self):
+        md = (
+            "## Raw Session Blocks (source for exercise_log, cardio_log, climbing_log)\n\n"
+            "### Upper A\n"
+            "Comments: felt good\n\n"
+            "Warmup\n"
+            "- [x] Bar Hangs 3x30s\n"
+            "- [ ] Side Planks 3x20s\n"
+        )
+        ctx = _make_ctx(_make_deps(raw_sessions_markdown=md))
         result = _inject_raw_sessions(ctx)
         assert "### Upper A" in result
-        assert "Warmup" in result
         assert "- [x] Bar Hangs 3x30s" in result
         assert "- [ ] Side Planks 3x20s" in result
-        assert "paragraph" not in result
-        assert "divider" not in result
-        assert "Some note" not in result
-
-    def test_comments_rendered(self):
-        sessions = [
-            {
-                "name": "Session",
-                "page_id": "p1",
-                "blocks": [{"block_type": "to_do", "text": "Squat", "checked": True}],
-                "comments": ["knee felt stiff", "reduced weight"],
-            }
-        ]
-        ctx = _make_ctx(_make_deps(raw_sessions_json=json.dumps(sessions)))
-        result = _inject_raw_sessions(ctx)
-        assert "knee felt stiff, reduced weight" in result
-
-    def test_no_comments_shows_none(self):
-        sessions = [
-            {
-                "name": "Session",
-                "page_id": "p1",
-                "blocks": [{"block_type": "to_do", "text": "Squat", "checked": True}],
-                "comments": [],
-            }
-        ]
-        ctx = _make_ctx(_make_deps(raw_sessions_json=json.dumps(sessions)))
-        result = _inject_raw_sessions(ctx)
-        assert "Comments: none" in result
-
-    def test_multiple_sessions_separated(self):
-        sessions = [
-            {"name": "A", "page_id": "p1", "blocks": [], "comments": []},
-            {"name": "B", "page_id": "p2", "blocks": [], "comments": []},
-        ]
-        ctx = _make_ctx(_make_deps(raw_sessions_json=json.dumps(sessions)))
-        result = _inject_raw_sessions(ctx)
-        assert "### A" in result
-        assert "### B" in result
+        assert "felt good" in result
 
 
 class TestInjectPlannedSessions:

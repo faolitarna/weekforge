@@ -32,15 +32,14 @@ def make_dummy_week_summary():
         trend=""
     )
 
-@patch("weekforge.tools.notion_api_gateway.query")
-@patch("weekforge.config.user_profile_loader.load_user_profile")
-def test_run_summarize_zero_sessions(mock_profile, mock_query, tmp_path):
-    from weekforge.models.user_profile import UserProfile
-    mock_profile.return_value = UserProfile.model_construct(page_id="test", markdown="test profile")
-    mock_query.return_value = []
+
+@patch("weekforge.tools.context_loader.load_week_summarize_context")
+def test_run_summarize_zero_sessions(mock_loader, tmp_path):
+    mock_loader.side_effect = RuntimeError("No session pages found for W00 in training_sessions DB.")
     store = CheckpointStore(str(tmp_path / "checkpoints.sqlite"))
     with pytest.raises(RuntimeError, match="No session pages found"):
         run_summarize("W00", "test-tid", store)
+
 
 @patch("weekforge.tools.notion_api_gateway.get_title_property_name", return_value="Name")
 @patch("weekforge.tools.notion_api_gateway.create")

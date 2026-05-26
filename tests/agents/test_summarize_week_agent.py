@@ -29,7 +29,7 @@ def test_summarize_week_agent(mock_run):
         ),
         plan_adherence=None,
         tier0_summary_json="{}",
-        raw_sessions_json="[]",
+        raw_sessions_markdown="",
         planned_plan_markdown=None,
         plan_state_raw=None,
     )
