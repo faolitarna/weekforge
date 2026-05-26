@@ -140,5 +140,20 @@ def resume(
     _run_or_pause(thread_id, lambda: runner_fn("", thread_id, store))
 
 
+@app.command("delete-thread")
+def delete_thread(
+    thread_id: str = typer.Argument(..., help="Thread ID of the checkpoint to delete."),
+) -> None:
+    """Delete a stale checkpoint that will never be resumed."""
+    store = _make_store()
+    rec = store.load(thread_id)
+    if rec is None:
+        console.print(f"[red]No checkpoint found for thread-id {thread_id}[/red]")
+        raise typer.Exit(code=1)
+
+    store.delete(thread_id)
+    console.print(f"[green]Deleted checkpoint: {thread_id} ({rec.workflow} @ {rec.step})[/green]")
+
+
 if __name__ == "__main__":
     app()

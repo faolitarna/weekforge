@@ -54,7 +54,7 @@ The `summarize-week` workflow. Reads completed sessions from Notion → Tier-0 m
 _Avoid_: summarization pipeline
 
 **Planning lifecycle**:
-The `plan` workflow. Reads PLAN_STATE + recent Week Summaries + Training Templates → LLM generates week plan and sessions → HITL review → writes sessions to Notion. Independent from extraction but better-informed when extraction runs first.
+The `draft-week` workflow. Reads PLAN_STATE + recent Week Summaries + Training Templates → LLM generates a week plan (session list with focus tags) → HITL review → Tier-0 validation (pull:push ratio, conditioning floor) → writes plan to Notion. Session-level detail writing is a separate future step. Independent from extraction but better-informed when extraction runs first.
 _Avoid_: generation pipeline
 
 **Workflow execution**:
