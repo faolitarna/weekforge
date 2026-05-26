@@ -1,8 +1,18 @@
+from __future__ import annotations
+
 import re
 
 from pydantic import BaseModel, Field
 
 from weekforge.models.week_summary import WeekSummary
+
+_PAIN_KEYWORDS = re.compile(r"\b(SI|spine|flare|pain|tendon|joint)\b", re.IGNORECASE)
+
+_SECTION_ORDER = [
+    "main_lifts", "push_pull_gap", "accessory_tracker", "focus_exercise_log",
+    "hangboard", "cardio", "climbing", "injury_timeline", "mobility_posture",
+    "adherence", "session_preferences", "deload_history", "resolved", "active_issues",
+]
 
 
 class PlanState(BaseModel):
@@ -10,7 +20,7 @@ class PlanState(BaseModel):
     total_weeks: int = 0
     weeks_completed: int = 0
     avg_completion: float = 0.0
-    
+
     main_lifts: list[str] = Field(default_factory=list)
     push_pull_gap: list[str] = Field(default_factory=list)
     accessory_tracker: list[str] = Field(default_factory=list)
@@ -26,132 +36,99 @@ class PlanState(BaseModel):
     resolved: list[str] = Field(default_factory=list)
     active_issues: list[str] = Field(default_factory=list)
 
-def parse_plan_state(text: str) -> PlanState:
-    state = PlanState()
-    current_section = None
-    
-    for line in text.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-            
-        if line.startswith("MESOCYCLE:"):
-            # MESOCYCLE:{name}|{total_weeks}wk
-            m = re.match(r"MESOCYCLE:(.*?)\|(\d+)wk", line)
-            if m:
-                state.mesocycle_name = m.group(1)
-                state.total_weeks = int(m.group(2))
-            continue
-            
-        if line.startswith("WEEKS_COMPLETED:"):
-            # WEEKS_COMPLETED:{N}|AVG_COMPLETION:{avg}%
-            m = re.match(r"WEEKS_COMPLETED:(\d+)\|AVG_COMPLETION:([\d\.]+)%", line)
-            if m:
-                state.weeks_completed = int(m.group(1))
-                state.avg_completion = float(m.group(2))
-            continue
+    # -- classmethods: parse / render --
 
-        if line.endswith(":") and " " not in line:
-            current_section = line[:-1].lower()
-            continue
-            
-        if current_section and line.startswith("- "):
-            val = line[2:]
-            # map current_section to field
-            field_name = current_section
-            if hasattr(state, field_name):
-                getattr(state, field_name).append(val)
-                
-    return state
+    @classmethod
+    def from_text(cls, text: str) -> PlanState:
+        state = cls()
+        current_section: str | None = None
 
-def update_mechanical_fields(state: PlanState, week: WeekSummary) -> PlanState:
-    """Update deterministic numeric fields before the agent call.
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
 
-    Mechanical updates (counts, averages, weight chains) are computed here so the
-    LLM only handles interpretive fields (trends, issues, preferences).
-    """
-    state.weeks_completed += 1
-    try:
+            if line.startswith("MESOCYCLE:"):
+                m = re.match(r"MESOCYCLE:(.*?)\|(\d+)wk", line)
+                if m:
+                    state.mesocycle_name = m.group(1)
+                    state.total_weeks = int(m.group(2))
+                continue
+
+            if line.startswith("WEEKS_COMPLETED:"):
+                m = re.match(r"WEEKS_COMPLETED:(\d+)\|AVG_COMPLETION:([\d\.]+)%", line)
+                if m:
+                    state.weeks_completed = int(m.group(1))
+                    state.avg_completion = float(m.group(2))
+                continue
+
+            if line.endswith(":") and " " not in line:
+                current_section = line[:-1].lower()
+                continue
+
+            if current_section and line.startswith("- "):
+                val = line[2:]
+                if hasattr(state, current_section):
+                    getattr(state, current_section).append(val)
+
+        return state
+
+    def to_text(self, current_week: str) -> str:
+        lines = [
+            f"PLAN_STATE:W01-{current_week}",
+            f"MESOCYCLE:{self.mesocycle_name}|{self.total_weeks}wk",
+            f"WEEKS_COMPLETED:{self.weeks_completed}|AVG_COMPLETION:{self.avg_completion:.1f}%",
+            "",
+        ]
+
+        for field_name in _SECTION_ORDER:
+            items = getattr(self, field_name)
+            if items:
+                lines.append(f"{field_name.upper()}:")
+                for item in items:
+                    lines.append(f"- {item}")
+                lines.append("")
+
+        return "\n".join(lines).strip()
+
+    # -- mechanical updates --
+
+    def apply_mechanical_update(self, week: WeekSummary) -> None:
+        self._update_completion(week)
+        self._append_adherence(week)
+        self._append_main_lift_weights(week)
+
+    def _update_completion(self, week: WeekSummary) -> None:
+        self.weeks_completed += 1
         done, total = map(int, week.completion.split("/"))
         week_pct = (done / total * 100) if total > 0 else 0.0
-        # Cumulative average
-        if state.weeks_completed == 1:
-            state.avg_completion = week_pct
+        if self.weeks_completed == 1:
+            self.avg_completion = week_pct
         else:
-            old_sum = state.avg_completion * (state.weeks_completed - 1)
-            state.avg_completion = (old_sum + week_pct) / state.weeks_completed
-    except Exception:
-        pass
-        
-    found_weekly = False
-    for i, adv in enumerate(state.adherence):
-        if adv.startswith("weekly:"):
-            parts = adv.split("|")
-            chain = parts[0]
-            try:
-                done, total = map(int, week.completion.split("/"))
-                new_pct = f"{int(done/total*100)}%" if total>0 else "0%"
-                chain += f"->{new_pct}"
-                state.adherence[i] = f"{chain}|avg:{int(state.avg_completion)}%"
-            except Exception:
-                pass
-            found_weekly = True
-            break
-            
-    if not found_weekly:
-        try:
-            done, total = map(int, week.completion.split("/"))
-            new_pct = f"{int(done/total*100)}%" if total>0 else "0%"
-            state.adherence.insert(0, f"weekly:{new_pct}|avg:{int(state.avg_completion)}%")
-        except Exception:
-            pass
-            
-    main_exercises = {e.name: e for e in week.exercise_log if e.role == "main"}
-    for i, ml in enumerate(state.main_lifts):
-        try:
-            # - {exercise}:{W01_weight}->{current}|peak:{max}kg|trend:{up/plateau/down}
-            ex_part, rest = ml.split(":", 1)
+            old_sum = self.avg_completion * (self.weeks_completed - 1)
+            self.avg_completion = (old_sum + week_pct) / self.weeks_completed
+
+    def _append_adherence(self, week: WeekSummary) -> None:
+        done, total = map(int, week.completion.split("/"))
+        new_pct = f"{int(done / total * 100)}%" if total > 0 else "0%"
+        for i, entry in enumerate(self.adherence):
+            if entry.startswith("weekly:"):
+                chain = entry.split("|")[0]
+                self.adherence[i] = f"{chain}->{new_pct}|avg:{int(self.avg_completion)}%"
+                return
+        self.adherence.insert(0, f"weekly:{new_pct}|avg:{int(self.avg_completion)}%")
+
+    def _append_main_lift_weights(self, week: WeekSummary) -> None:
+        main_exercises = {e.name: e for e in week.exercise_log if e.role == "main"}
+        for i, entry in enumerate(self.main_lifts):
+            ex_part, rest = entry.split(":", 1)
             if ex_part in main_exercises:
                 ex = main_exercises[ex_part]
                 w = ex.actual_weight or ex.planned_weight or "BW"
-                # insert ->w into the chain
                 chain_part, meta_part = rest.split("|", 1)
-                chain_part += f"->{w}"
-                state.main_lifts[i] = f"{ex_part}:{chain_part}|{meta_part}"
-        except Exception:
-            pass
-            
-    return state
+                self.main_lifts[i] = f"{ex_part}:{chain_part}->{w}|{meta_part}"
 
-def render_plan_state(state: PlanState, current_week: str) -> str:
-    lines = []
-    lines.append(f"PLAN_STATE:W01-{current_week}")
-    lines.append(f"MESOCYCLE:{state.mesocycle_name}|{state.total_weeks}wk")
-    lines.append(f"WEEKS_COMPLETED:{state.weeks_completed}|AVG_COMPLETION:{state.avg_completion:.1f}%")
-    lines.append("")
-    
-    sections = [
-        ("MAIN_LIFTS", state.main_lifts),
-        ("PUSH_PULL_GAP", state.push_pull_gap),
-        ("ACCESSORY_TRACKER", state.accessory_tracker),
-        ("FOCUS_EXERCISE_LOG", state.focus_exercise_log),
-        ("HANGBOARD", state.hangboard),
-        ("CARDIO", state.cardio),
-        ("CLIMBING", state.climbing),
-        ("INJURY_TIMELINE", state.injury_timeline),
-        ("MOBILITY_POSTURE", state.mobility_posture),
-        ("ADHERENCE", state.adherence),
-        ("SESSION_PREFERENCES", state.session_preferences),
-        ("DELOAD_HISTORY", state.deload_history),
-        ("RESOLVED", state.resolved),
-        ("ACTIVE_ISSUES", state.active_issues),
-    ]
-    
-    for title, items in sections:
-        if items: # Only output if not empty, following legacy loose text rules (or maybe output header anyway, but usually better to output the header to preserve structure if possible. I'll output headers if not empty)
-            lines.append(f"{title}:")
-            for item in items:
-                lines.append(f"- {item}")
-            lines.append("")
-            
-    return "\n".join(lines).strip()
+    # -- queries --
+
+    def has_active_pain(self) -> bool:
+        return any(_PAIN_KEYWORDS.search(issue) for issue in self.active_issues)

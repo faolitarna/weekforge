@@ -1,4 +1,3 @@
-import re
 from dataclasses import dataclass
 from typing import Literal
 
@@ -7,16 +6,12 @@ from weekforge.config.user_profile_loader import load_user_profile
 from weekforge.models.week_summary import SessionLine, WeekSummary
 from weekforge.tools import notion_api_gateway as notion
 from weekforge.tools import summaries_db
-from weekforge.tools.plan_state import PlanState, parse_plan_state
+from weekforge.tools.plan_state import _PAIN_KEYWORDS, PlanState
 from weekforge.tools.raw_session_collector import (
     assemble_raw_week,
     compute_checkbox_analysis,
 )
 
-_PAIN_KEYWORDS = re.compile(
-    r"\b(SI|spine|flare|pain|tendon|joint)\b",
-    re.IGNORECASE,
-)
 
 _HEADING_TYPES = {"heading_1", "heading_2", "heading_3"}
 
@@ -123,12 +118,7 @@ def derive_active_flare(
         if most_recent.summary_text and _PAIN_KEYWORDS.search(most_recent.summary_text):
             recent_pain = True
 
-    chronic_active_issue = False
-    if plan_state and plan_state.active_issues:
-        for issue in plan_state.active_issues:
-            if _PAIN_KEYWORDS.search(issue):
-                chronic_active_issue = True
-                break
+    chronic_active_issue = plan_state.has_active_pain() if plan_state else False
 
     return recent_pain or chronic_active_issue
 
@@ -171,7 +161,7 @@ def load_week_draft_context(week_prefix: str) -> WeekDraftContext:
     feedback_window_markdown = _format_feedback_window(feedback_rows)
 
     raw_text, page_id = summaries_db.find_plan_state_row()
-    plan_state = parse_plan_state(raw_text) if raw_text else None
+    plan_state = PlanState.from_text(raw_text) if raw_text else None
 
     profile = load_user_profile()
     active_flare = derive_active_flare(feedback_rows, plan_state)

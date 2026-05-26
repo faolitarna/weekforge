@@ -111,19 +111,14 @@ def _step_plan_state_update(state: SummarizeWeekState, cost: RunCost) -> str | N
     )
     from weekforge.config.env import settings
     from weekforge.tools import notion_api_gateway as notion
-    from weekforge.tools.plan_state import (
-        PlanState,
-        parse_plan_state,
-        render_plan_state,
-        update_mechanical_fields,
-    )
+    from weekforge.tools.plan_state import PlanState
 
     assert state.is_bootstrap is not None
 
     assert state.last_output is not None
     if not state.is_bootstrap:
-        existing_ps = parse_plan_state(state.plan_state_raw or "")
-        existing_ps = update_mechanical_fields(existing_ps, state.last_output)
+        existing_ps = PlanState.from_text(state.plan_state_raw or "")
+        existing_ps.apply_mechanical_update(state.last_output)
         _verbose(f"plan_state_update: mechanical fields updated, week {existing_ps.weeks_completed}")
 
         plan_deps = PlanStateDeps(existing_plan_state=existing_ps, new_week=state.last_output)
@@ -136,7 +131,7 @@ def _step_plan_state_update(state: SummarizeWeekState, cost: RunCost) -> str | N
         cost.add(meta)
         _verbose(f"plan_state_update: {meta.input_tokens} input / {meta.output_tokens} output tokens")
 
-        rendered_ps = render_plan_state(updated_ps, state.week_prefix)
+        rendered_ps = updated_ps.to_text(state.week_prefix)
         code_block = f"```text\n{rendered_ps}\n```"
 
         assert state.plan_state_page_id is not None
@@ -158,7 +153,7 @@ def _step_plan_state_update(state: SummarizeWeekState, cost: RunCost) -> str | N
         cost.add(meta)
         _verbose(f"plan_state_update: {meta.input_tokens} input / {meta.output_tokens} output tokens")
 
-        rendered_ps = render_plan_state(updated_ps, state.week_prefix)
+        rendered_ps = updated_ps.to_text(state.week_prefix)
         code_block = f"```text\n{rendered_ps}\n```"
 
         title_prop = notion.get_title_property_name(settings.notion_db_training_week_summaries)
